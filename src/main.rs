@@ -1,3 +1,6 @@
+mod checker;
+mod orchestrator;
+
 struct Args {
     host_to_check: Option<String>,
 }
@@ -18,19 +21,11 @@ fn parse_args() -> Result<Args, lexopt::Error> {
     Ok(Args { host_to_check })
 }
 
-fn orchestrator_main() {
-    println!("The orchestrator welcomes you!");
-}
-
-fn checker_main(host: String) {
-    println!("Checking Fediverse instance at {}", host);
-}
-
 fn main() -> Result<(), lexopt::Error> {
     let args = parse_args()?;
     match args.host_to_check {
-        None => orchestrator_main(),
-        Some(host) => checker_main(host),
+        None => orchestrator::main(),
+        Some(host) => checker::main(host),
     }
     Ok(())
 }
