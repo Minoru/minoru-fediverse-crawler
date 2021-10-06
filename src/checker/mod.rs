@@ -8,20 +8,20 @@ pub fn main(host: String) -> anyhow::Result<()> {
 
     let rt = Runtime::new()?;
     info!(logger, "Started Tokio runtime");
-    rt.block_on(async_main(logger.new(o!("host" => host.clone())), &host))
+    rt.block_on(async_main(&logger.new(o!("host" => host.clone())), &host))
 }
 
-async fn async_main(logger: Logger, host: &str) -> anyhow::Result<()> {
+async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
-    let software = get_software(logger.clone(), host).await?;
+    let software = get_software(logger, host).await?;
     info!(logger, "{} runs {}", host, software);
 
     Ok(())
 }
 
-async fn get_software(logger: Logger, host: &str) -> anyhow::Result<String> {
-    let nodeinfo = fetch_nodeinfo(logger.clone(), host).await?;
+async fn get_software(logger: &Logger, host: &str) -> anyhow::Result<String> {
+    let nodeinfo = fetch_nodeinfo(logger, host).await?;
     json::parse(&nodeinfo)
         .map(|obj| obj["software"]["name"].to_string())
         .map_err(|err| {
@@ -45,8 +45,8 @@ struct NodeInfoPointerLink {
     href: String,
 }
 
-async fn fetch_nodeinfo(logger: Logger, host: &str) -> anyhow::Result<String> {
-    let pointer = fetch_nodeinfo_pointer(logger.clone(), host).await?;
+async fn fetch_nodeinfo(logger: &Logger, host: &str) -> anyhow::Result<String> {
+    let pointer = fetch_nodeinfo_pointer(logger, host).await?;
     // TODO: add sanitization step that removes any links that point outside of the current host's
     // domain
     let url = pick_highest_supported_nodeinfo_version(&pointer).ok_or_else(|| {
@@ -57,10 +57,10 @@ async fn fetch_nodeinfo(logger: Logger, host: &str) -> anyhow::Result<String> {
         error!(logger, "{}", &msg);
         anyhow!(msg)
     })?;
-    fetch_nodeinfo_document(logger.clone(), &url).await
+    fetch_nodeinfo_document(logger, &url).await
 }
 
-async fn fetch_nodeinfo_pointer(logger: Logger, host: &str) -> anyhow::Result<NodeInfoPointer> {
+async fn fetch_nodeinfo_pointer(logger: &Logger, host: &str) -> anyhow::Result<NodeInfoPointer> {
     let url = format!("https://{}/.well-known/nodeinfo", host);
     // TODO: set Accept to application/json
     let response = reqwest::get(&url).await?;
@@ -96,7 +96,7 @@ fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> Option<
         .map(|result| result.1.href.clone())
 }
 
-async fn fetch_nodeinfo_document(logger: Logger, url: &str) -> anyhow::Result<String> {
+async fn fetch_nodeinfo_document(logger: &Logger, url: &str) -> anyhow::Result<String> {
     // TODO: set Accept to application/json
     let response = reqwest::get(url).await?;
     response.error_for_status_ref().map_err(|err| {
