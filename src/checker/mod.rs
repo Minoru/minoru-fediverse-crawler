@@ -14,9 +14,16 @@ pub fn main(host: String) -> anyhow::Result<()> {
 async fn async_main(logger: Logger, host: &str) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
+    let software = get_software(logger.clone(), host).await?;
+    info!(logger, "{} runs {}", host, software);
+
+    Ok(())
+}
+
+async fn get_software(logger: Logger, host: &str) -> anyhow::Result<String> {
     let nodeinfo = fetch_nodeinfo(logger.clone(), host).await?;
-    let software = json::parse(&nodeinfo)
-        .map(|obj| obj["software"]["name"].clone())
+    json::parse(&nodeinfo)
+        .map(|obj| obj["software"]["name"].to_string())
         .map_err(|err| {
             let msg = format!(
                 "Failed to figure out the software name from the NodeInfo {}: {}",
@@ -24,10 +31,7 @@ async fn async_main(logger: Logger, host: &str) -> anyhow::Result<()> {
             );
             error!(logger, "{}", &msg; "json_error" => err.to_string());
             anyhow!(msg)
-        })?;
-    info!(logger, "{} runs {}", host, software);
-
-    Ok(())
+        })
 }
 
 #[derive(Debug, Deserialize)]
