@@ -21,7 +21,7 @@ fn parse_args() -> Result<Args, lexopt::Error> {
     Ok(Args { host_to_check })
 }
 
-fn main() -> Result<(), lexopt::Error> {
+fn main() -> anyhow::Result<()> {
     let args = parse_args()?;
     match args.host_to_check {
         None => orchestrator::main(),

@@ -8,3 +8,4 @@ license = " AGPL-3.0-or-later"
 
 [dependencies]
 lexopt = "0.1"
+anyhow = "1"
