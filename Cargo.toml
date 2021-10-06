@@ -15,3 +15,4 @@ slog-journald = "2"
 reqwest = { version = "0.11", features = [ "gzip", "brotli", "deflate", "json" ] }
 serde = { version = "1", features = [ "derive" ] }
 json = "0.12"
+url = "2"
