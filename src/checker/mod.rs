@@ -4,6 +4,7 @@ use serde::Deserialize;
 use slog::{error, info, o, Drain, Logger};
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use url::Url;
 
 pub fn main(host: String) -> anyhow::Result<()> {
     let logger = slog::Logger::root(slog_journald::JournaldDrain.ignore_res(), o!());
@@ -16,8 +17,20 @@ pub fn main(host: String) -> anyhow::Result<()> {
 async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
+    // Accept no more than 5 redirects, and only allow redirects to current domain and its
+    // subdomains
+    let redirect_policy = reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() > 5 {
+            attempt.error("too many redirects")
+        } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
+            attempt.follow()
+        } else {
+            attempt.stop()
+        }
+    });
     let client = reqwest::ClientBuilder::new()
         // TODO: set a User Agent with a URL that describes the bot
+        .redirect(redirect_policy)
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(|err| {
@@ -144,6 +157,33 @@ async fn fetch_nodeinfo_document(
     Ok(response.text().await?)
 }
 
+/// Returns `true` if all of the following holds:
+/// - the URLs have the same schema
+/// - the URLs use the same domain, or one domain is a sub-domain of another
+/// - the URLs use the same port (if any; port can be implied by the schema)
+fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
+    use url::{Host::*, Origin::*};
+
+    match (lhs.origin(), rhs.origin()) {
+        (Opaque(lhs), Opaque(rhs)) => lhs == rhs,
+        (Opaque(_), _) => false,
+        (_, Opaque(_)) => false,
+        (Tuple(lhs_schema, lhs_host, lhs_port), Tuple(rhs_schema, rhs_host, rhs_port)) => {
+            let same_host = match (lhs_host, rhs_host) {
+                (Domain(lhs), Domain(rhs)) => lhs
+                    .rsplit('.')
+                    .zip(rhs.rsplit('.'))
+                    .all(|(lhs, rhs)| lhs == rhs),
+                (Ipv4(lhs), Ipv4(rhs)) => lhs == rhs,
+                (Ipv6(lhs), Ipv6(rhs)) => lhs == rhs,
+                _ => false,
+            };
+
+            lhs_schema == rhs_schema && same_host && lhs_port == rhs_port
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -206,5 +246,26 @@ mod test {
             }),
             Some("highest is the first".to_string())
         );
+    }
+
+    #[test]
+    fn test_origin() {
+        let http_example_com = Url::parse("http://example.com").unwrap();
+        let https_example_com = Url::parse("https://example.com").unwrap();
+        let https_foo_example_com = Url::parse("https://foo.example.com").unwrap();
+        let https_example_com_443 = Url::parse("https://example.com:443").unwrap();
+        let https_example_com_444 = Url::parse("https://example.com:444").unwrap();
+        let https_example_org = Url::parse("https://example.org").unwrap();
+
+        assert!(!is_same_origin(&http_example_com, &https_example_com));
+        assert!(!is_same_origin(&https_example_com, &http_example_com));
+        assert!(!is_same_origin(&https_example_com, &https_example_org));
+        assert!(!is_same_origin(&https_example_com, &https_example_com_444));
+
+        assert!(is_same_origin(&https_example_com, &https_example_com));
+        assert!(is_same_origin(&https_example_com, &https_foo_example_com));
+        assert!(is_same_origin(&https_foo_example_com, &https_example_com));
+
+        assert!(is_same_origin(&https_example_com, &https_example_com_443));
     }
 }
