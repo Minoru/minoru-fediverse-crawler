@@ -25,7 +25,7 @@ fn main() -> anyhow::Result<()> {
     let args = parse_args()?;
     match args.host_to_check {
         None => orchestrator::main(),
-        Some(host) => checker::main(host),
+        Some(host) => checker::main(host)?,
     }
     Ok(())
 }
