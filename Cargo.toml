@@ -10,3 +10,5 @@ license = " AGPL-3.0-or-later"
 lexopt = "0.1"
 anyhow = "1"
 tokio = { version = "1", features = [ "full" ] }
+sloggers = "2"
+slog = "2"
