@@ -1,17 +1,8 @@
-use slog::{info, o, Logger};
-use sloggers::{
-    terminal::{Destination, TerminalLoggerBuilder},
-    types::Severity,
-    Build,
-};
+use slog::{info, o, Drain, Logger};
 use tokio::runtime::Runtime;
 
 pub fn main(host: String) -> anyhow::Result<()> {
-    let mut builder = TerminalLoggerBuilder::new();
-    builder.level(Severity::Info);
-    builder.destination(Destination::Stderr);
-
-    let logger = builder.build()?;
+    let logger = slog::Logger::root(slog_journald::JournaldDrain.ignore_res(), o!());
 
     let rt = Runtime::new()?;
     info!(logger, "Started Tokio runtime");
