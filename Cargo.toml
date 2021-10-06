@@ -12,3 +12,6 @@ anyhow = "1"
 tokio = { version = "1", features = [ "full" ] }
 slog = "2"
 slog-journald = "2"
+reqwest = { version = "0.11", features = [ "json" ] }
+serde = { version = "1", features = [ "derive" ] }
+json = "0.12"
