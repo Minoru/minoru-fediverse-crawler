@@ -27,6 +27,9 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
 
+    let peers = get_peers(logger, &client, host, &software).await?;
+    info!(logger, "{} has {} peers", host, peers.len());
+
     Ok(())
 }
 
@@ -201,6 +204,46 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
             lhs_schema == rhs_schema && same_host && lhs_port == rhs_port
         }
     }
+}
+
+async fn get_peers(
+    logger: &Logger,
+    client: &Client,
+    host: &str,
+    software: &str,
+) -> anyhow::Result<Vec<String>> {
+    match software {
+        "mastodon" | "pleroma" | "misskey" | "bookwyrm" => {
+            get_peers_mastodonish(logger, client, host).await
+        }
+        _ => Ok(vec![]),
+    }
+}
+
+async fn get_peers_mastodonish(
+    logger: &Logger,
+    client: &Client,
+    host: &str,
+) -> anyhow::Result<Vec<String>> {
+    let url = format!("https://{}/api/v1/instance/peers", host);
+    let response = client
+        .get(&url)
+        .header(
+            reqwest::header::ACCEPT,
+            reqwest::header::HeaderValue::from_static("application/json"),
+        )
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await?;
+    response.error_for_status_ref().map_err(|err| {
+        error!(
+            logger, "Failed to fetch Mastodon-ish peers: {}", err;
+            "http_error" => err.to_string(), "url" => url);
+        err
+    })?;
+
+    // TODO: replace this with a parser that only processes the first megabyte of the response
+    Ok(response.json::<Vec<String>>().await?)
 }
 
 #[cfg(test)]
