@@ -23,9 +23,9 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
         if attempt.previous().len() > 5 {
             attempt.error("too many redirects")
         } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
-            attempt.follow()
+            attempt.error("redirected outside of current origin")
         } else {
-            attempt.stop()
+            attempt.follow()
         }
     });
     let client = reqwest::ClientBuilder::new()
