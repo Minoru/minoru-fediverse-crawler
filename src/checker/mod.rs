@@ -19,15 +19,25 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
 
     // Accept no more than 5 redirects, and only allow redirects to current domain and its
     // subdomains
-    let redirect_policy = reqwest::redirect::Policy::custom(|attempt| {
-        if attempt.previous().len() > 5 {
-            attempt.error("too many redirects")
-        } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
-            attempt.error("redirected outside of current origin")
-        } else {
-            attempt.follow()
-        }
-    });
+    let redirect_policy = {
+        let logger = logger.clone();
+        reqwest::redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() > 5 {
+                error!(logger, "Too many redirects: {:?}", attempt.previous());
+                attempt.error("too many redirects")
+            } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
+                error!(
+                    logger,
+                    "Redirect points to {} which is of different origin than {}",
+                    attempt.url(),
+                    &attempt.previous()[0]
+                );
+                attempt.error("redirected outside of current origin")
+            } else {
+                attempt.follow()
+            }
+        })
+    };
     let client = reqwest::ClientBuilder::new()
         // TODO: set a User Agent with a URL that describes the bot
         .redirect(redirect_policy)
