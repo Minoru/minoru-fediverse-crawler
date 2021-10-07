@@ -17,6 +17,15 @@ pub fn main(host: String) -> anyhow::Result<()> {
 async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
+    let client = prepare_reqwest_client(logger)?;
+
+    let software = get_software(logger, &client, host).await?;
+    info!(logger, "{} runs {}", host, software);
+
+    Ok(())
+}
+
+fn prepare_reqwest_client(logger: &Logger) -> anyhow::Result<Client> {
     // Accept no more than 5 redirects, and only allow redirects to current domain and its
     // subdomains
     let redirect_policy = {
@@ -38,7 +47,7 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
             }
         })
     };
-    let client = reqwest::ClientBuilder::new()
+    reqwest::ClientBuilder::new()
         // TODO: set a User Agent with a URL that describes the bot
         .redirect(redirect_policy)
         .timeout(Duration::from_secs(30))
@@ -47,12 +56,7 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
             let msg = format!("Failed to prepare a reqwest client: {}", err);
             error!(logger, "{}", &msg);
             anyhow!(msg)
-        })?;
-
-    let software = get_software(logger, &client, host).await?;
-    info!(logger, "{} runs {}", host, software);
-
-    Ok(())
+        })
 }
 
 async fn get_software(logger: &Logger, client: &Client, host: &str) -> anyhow::Result<String> {
