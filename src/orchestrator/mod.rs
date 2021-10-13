@@ -36,20 +36,24 @@ fn run_checker(logger: Logger, target: &str) -> anyhow::Result<()> {
         error!(logger, "{}", msg);
         anyhow!(msg)
     })?;
-    let mut reader = BufReader::new(output);
+    let reader = BufReader::new(output);
+    let mut lines = reader.lines();
 
     let state = {
-        let mut line = String::new();
-        reader.read_line(&mut line).map_err(|err| {
-            let msg = format!("Failed to read a line of checker's response: {}", err);
-            error!(logger, "{}", &msg);
-            anyhow!(msg)
-        })?;
-        serde_json::from_str(&line).map_err(|err| {
-            let msg = format!("failed to deserialize checker's response: {}", err);
-            error!(logger, "{}", &msg);
-            anyhow!(msg)
-        })?
+        if let Some(line) = lines.next() {
+            let line = line.map_err(|err| {
+                let msg = format!("Failed to read a line of checker's response: {}", err);
+                error!(logger, "{}", &msg);
+                anyhow!(msg)
+            })?;
+            serde_json::from_str(&line).map_err(|err| {
+                let msg = format!("failed to deserialize checker's response: {}", err);
+                error!(logger, "{}", &msg);
+                anyhow!(msg)
+            })?
+        } else {
+            return Ok(());
+        }
     };
 
     match state {
@@ -59,7 +63,7 @@ fn run_checker(logger: Logger, target: &str) -> anyhow::Result<()> {
             bail!(msg);
         }
         ipc::CheckerResponse::State { state } => match state {
-            ipc::InstanceState::Alive => process_peers(logger, target, reader)?,
+            ipc::InstanceState::Alive => process_peers(logger, target, lines)?,
             ipc::InstanceState::Moving { hostname } => {
                 println!("{} is moving to {}", target, hostname)
             }
@@ -72,13 +76,13 @@ fn run_checker(logger: Logger, target: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn process_peers<R: std::io::Read>(
+fn process_peers(
     logger: Logger,
     target: &str,
-    reader: BufReader<R>,
+    lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
     let mut peers_count = 0;
-    for response in reader.lines() {
+    for response in lines {
         let response = response.map_err(|err| {
             let msg = format!("Failed to read a line of checker's response: {}", err);
             error!(logger, "{}", &msg);
