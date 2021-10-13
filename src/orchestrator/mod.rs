@@ -1,5 +1,5 @@
 use crate::ipc;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use slog::{error, o, Drain, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -36,7 +36,47 @@ fn run_checker(logger: Logger, target: &str) -> anyhow::Result<()> {
         error!(logger, "{}", msg);
         anyhow!(msg)
     })?;
-    let reader = BufReader::new(output);
+    let mut reader = BufReader::new(output);
+
+    let state = {
+        let mut line = String::new();
+        reader.read_line(&mut line).map_err(|err| {
+            let msg = format!("Failed to read a line of checker's response: {}", err);
+            error!(logger, "{}", &msg);
+            anyhow!(msg)
+        })?;
+        serde_json::from_str(&line).map_err(|err| {
+            let msg = format!("failed to deserialize checker's response: {}", err);
+            error!(logger, "{}", &msg);
+            anyhow!(msg)
+        })?
+    };
+
+    match state {
+        ipc::CheckerResponse::Peer { hostname: _ } => {
+            let msg = "Expected the checker to respond with State, but it responded with Peer";
+            error!(logger, "{}", msg);
+            bail!(msg);
+        }
+        ipc::CheckerResponse::State { state } => match state {
+            ipc::InstanceState::Alive => process_peers(logger, target, reader)?,
+            ipc::InstanceState::Moving { hostname } => {
+                println!("{} is moving to {}", target, hostname)
+            }
+            ipc::InstanceState::Moved { hostname } => {
+                println!("{} has moved to {}", target, hostname)
+            }
+        },
+    }
+
+    Ok(())
+}
+
+fn process_peers<R: std::io::Read>(
+    logger: Logger,
+    target: &str,
+    reader: BufReader<R>,
+) -> anyhow::Result<()> {
     let mut peers_count = 0;
     for response in reader.lines() {
         let response = response.map_err(|err| {
@@ -52,17 +92,11 @@ fn run_checker(logger: Logger, target: &str) -> anyhow::Result<()> {
         })?;
 
         match response {
-            ipc::CheckerResponse::State { state } => match state {
-                ipc::InstanceState::Alive => println!("{} is alive!", target),
-                ipc::InstanceState::Moving { hostname } => {
-                    println!("{} is moving to {}", target, hostname);
-                    return Ok(());
-                }
-                ipc::InstanceState::Moved { hostname } => {
-                    println!("{} has moved to {}", target, hostname);
-                    return Ok(());
-                }
-            },
+            ipc::CheckerResponse::State { state: _ } => {
+                let msg = "Expected the checker to respond with Peer, but it responded with State";
+                error!(logger, "{}", msg);
+                bail!(msg);
+            }
             ipc::CheckerResponse::Peer { hostname: _ } => peers_count += 1,
         }
     }
