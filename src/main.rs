@@ -1,4 +1,5 @@
 mod checker;
+mod ipc;
 mod orchestrator;
 
 struct Args {

@@ -1,3 +1,4 @@
+use crate::ipc;
 use anyhow::anyhow;
 use reqwest::Client;
 use serde::Deserialize;
@@ -27,8 +28,17 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
 
+    let alive = serde_json::to_string(&ipc::CheckerResponse::State {
+        state: ipc::InstanceState::Alive,
+    })?;
+    println!("{}", alive);
+
     let peers = get_peers(logger, &client, host, &software).await?;
     info!(logger, "{} has {} peers", host, peers.len());
+    for instance in peers {
+        let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { hostname: instance })?;
+        println!("{}", peer);
+    }
 
     Ok(())
 }
