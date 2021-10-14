@@ -1,15 +1,12 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
-use slog::{error, Logger};
+use slog::Logger;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
-pub fn main(logger: Logger) -> anyhow::Result<()> {
-    run_checker("mastodon.social").map_err(|err| {
-        error!(logger, "{}", err);
-        err
-    })
+pub fn main(_logger: Logger) -> anyhow::Result<()> {
+    run_checker("mastodon.social")
 }
 
 fn run_checker(target: &str) -> anyhow::Result<()> {
