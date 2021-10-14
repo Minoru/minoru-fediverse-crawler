@@ -1,5 +1,5 @@
 use crate::ipc;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use reqwest::Client;
 use serde::Deserialize;
 use slog::{error, info, o, Drain, Logger};
@@ -70,11 +70,7 @@ fn prepare_reqwest_client(logger: &Logger) -> anyhow::Result<Client> {
         .redirect(redirect_policy)
         .timeout(Duration::from_secs(30))
         .build()
-        .map_err(|err| {
-            let msg = format!("Failed to prepare a reqwest client: {}", err);
-            error!(logger, "{}", &msg);
-            anyhow!(msg)
-        })
+        .context("Failed to prepare a reqwest client")
 }
 
 async fn get_software(logger: &Logger, client: &Client, host: &str) -> anyhow::Result<String> {
@@ -107,12 +103,10 @@ async fn fetch_nodeinfo(logger: &Logger, client: &Client, host: &str) -> anyhow:
     // TODO: add sanitization step that removes any links that point outside of the current host's
     // domain
     let url = pick_highest_supported_nodeinfo_version(&pointer).ok_or_else(|| {
-        let msg = format!(
+        anyhow!(
             "Failed to pick the highest supported NodeInfo version out of {:?}",
             pointer.links
-        );
-        error!(logger, "{}", &msg);
-        anyhow!(msg)
+        )
     })?;
     fetch_nodeinfo_document(logger, client, &url).await
 }
