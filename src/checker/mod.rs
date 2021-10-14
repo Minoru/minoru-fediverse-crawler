@@ -2,14 +2,12 @@ use crate::ipc;
 use anyhow::{anyhow, Context};
 use reqwest::Client;
 use serde::Deserialize;
-use slog::{error, info, o, Drain, Logger};
+use slog::{error, info, o, Logger};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use url::Url;
 
-pub fn main(host: String) -> anyhow::Result<()> {
-    let logger = slog::Logger::root(slog_journald::JournaldDrain.ignore_res(), o!());
-
+pub fn main(logger: Logger, host: String) -> anyhow::Result<()> {
     let rt = Runtime::new()?;
     info!(logger, "Started Tokio runtime");
 

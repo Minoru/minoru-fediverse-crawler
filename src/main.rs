@@ -1,3 +1,5 @@
+use slog::{error, o, Drain, Logger};
+
 mod checker;
 mod ipc;
 mod orchestrator;
@@ -23,10 +25,18 @@ fn parse_args() -> Result<Args, lexopt::Error> {
 }
 
 fn main() -> anyhow::Result<()> {
+    let logger = slog::Logger::root(slog_journald::JournaldDrain.ignore_res(), o!());
+    logged_main(logger.clone()).map_err(|err| {
+        error!(logger, "{}", err);
+        err
+    })
+}
+
+fn logged_main(logger: Logger) -> anyhow::Result<()> {
     let args = parse_args()?;
     match args.host_to_check {
-        None => orchestrator::main()?,
-        Some(host) => checker::main(host)?,
+        None => orchestrator::main(logger)?,
+        Some(host) => checker::main(logger, host)?,
     }
     Ok(())
 }
