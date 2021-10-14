@@ -1,13 +1,15 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
-use rusqlite::Connection;
+use chrono::prelude::*;
+use rusqlite::{params, Connection};
 use slog::Logger;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
 pub fn main(_logger: Logger) -> anyhow::Result<()> {
-    let _db = init_database().context("Failed to initialize the database")?;
+    let db = init_database().context("Failed to initialize the database")?;
+    reschedule_missed_checks(db)?;
     run_checker("mastodon.social").context("Failed to check mastodon.social")
 }
 
@@ -47,6 +49,34 @@ fn init_database() -> anyhow::Result<Connection> {
     )?;
 
     Ok(conn)
+}
+
+/// Random datetime about a day away from now (±10%).
+fn rand_datetime_daily() -> anyhow::Result<DateTime<Utc>> {
+    use chrono::Duration;
+
+    const OFFSET: i64 = 24 * 60 * 60 / 10; // 10% of the day
+    let offset = Duration::days(1) + Duration::seconds(fastrand::i64(-OFFSET..OFFSET));
+    Utc::now().checked_add_signed(offset).ok_or_else(|| {
+        anyhow!(
+            "Failed to add {} to the current datetime, as it will lead to overflow",
+            offset
+        )
+    })
+}
+
+fn reschedule_missed_checks(db: Connection) -> anyhow::Result<()> {
+    let mut statement =
+        db.prepare("SELECT id FROM instances WHERE next_check_datetime < CURRENT_TIMESTAMP")?;
+    let mut ids = statement.query([])?;
+    while let Some(row) = ids.next()? {
+        let instance_id: u64 = row.get(0)?;
+        db.execute(
+            "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
+            params![rand_datetime_daily()?, instance_id],
+        )?;
+    }
+    Ok(())
 }
 
 fn run_checker(target: &str) -> anyhow::Result<()> {
