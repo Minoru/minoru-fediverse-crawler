@@ -7,13 +7,13 @@ license = " AGPL-3.0-or-later"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lexopt = "0.1"
 anyhow = "1"
-tokio = { version = "1", features = [ "full" ] }
-slog = "2"
-slog-journald = "2"
+json = "0.12"
+lexopt = "0.1"
 reqwest = { version = "0.11", features = [ "gzip", "brotli", "deflate", "json" ] }
 serde = { version = "1", features = [ "derive" ] }
-json = "0.12"
-url = "2"
 serde_json = "1"
+slog = "2"
+slog-journald = "2"
+tokio = { version = "1", features = [ "full" ] }
+url = "2"
