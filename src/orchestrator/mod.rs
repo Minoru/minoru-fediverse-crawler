@@ -1,12 +1,52 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
+use rusqlite::Connection;
 use slog::Logger;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
 pub fn main(_logger: Logger) -> anyhow::Result<()> {
-    run_checker("mastodon.social")
+    let _db = init_database().context("Failed to initialize the database")?;
+    run_checker("mastodon.social").context("Failed to check mastodon.social")
+}
+
+fn init_database() -> anyhow::Result<Connection> {
+    let conn = Connection::open("fediverse.observer.db")?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS states(
+            id INTEGER PRIMARY KEY NOT NULL,
+            state TEXT UNIQUE NOT NULL
+        )",
+        [],
+    )?;
+    conn.execute(
+        r#"INSERT OR IGNORE INTO states (id, state)
+        VALUES
+            (0, "discovered"),
+            (1, "alive"),
+            (2, "dying"),
+            (3, "dead"),
+            (4, "moving"),
+            (5, "moved")"#,
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS instances(
+            id INTEGER PRIMARY KEY NOT NULL,
+            hostname TEXT UNIQUE NOT NULL,
+            state REFERENCES states(id) NOT NULL DEFAULT 0,
+            next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP
+        )",
+        [],
+    )?;
+    conn.execute(
+        r#"INSERT OR IGNORE INTO instances(hostname) VALUES ("mastodon.social")"#,
+        [],
+    )?;
+
+    Ok(conn)
 }
 
 fn run_checker(target: &str) -> anyhow::Result<()> {
