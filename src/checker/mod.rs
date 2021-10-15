@@ -97,12 +97,7 @@ async fn fetch_nodeinfo(logger: &Logger, client: &Client, host: &Host) -> anyhow
     let pointer = fetch_nodeinfo_pointer(logger, client, host).await?;
     // TODO: add sanitization step that removes any links that point outside of the current host's
     // domain
-    let url = pick_highest_supported_nodeinfo_version(&pointer).ok_or_else(|| {
-        anyhow!(
-            "Failed to pick the highest supported NodeInfo version out of {:?}",
-            pointer.links
-        )
-    })?;
+    let url = pick_highest_supported_nodeinfo_version(&pointer)?;
     fetch_nodeinfo_document(logger, client, &url).await
 }
 
@@ -132,7 +127,7 @@ async fn fetch_nodeinfo_pointer(
     Ok(response.json::<NodeInfoPointer>().await?)
 }
 
-fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> Option<String> {
+fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow::Result<Url> {
     // This array in the ascending order of schema versions.
     const SUPPORTED_NODEINFO_SCHEMAS: [&'static str; 4] = [
         "http://nodeinfo.diaspora.software/ns/schema/1.0",
@@ -150,16 +145,23 @@ fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> Option<
                 .map(|priority| (priority, link))
         })
         .max_by_key(|result| result.0)
-        .map(|result| result.1.href.clone())
+        .map(|result| &result.1.href)
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to extract highest supported NodeInfo version's URL from {:?}",
+                pointer.links
+            )
+        })
+        .and_then(|u| Ok(Url::parse(u)?))
 }
 
 async fn fetch_nodeinfo_document(
     logger: &Logger,
     client: &Client,
-    url: &str,
+    url: &Url,
 ) -> anyhow::Result<String> {
     let response = client
-        .get(url)
+        .get(url.clone())
         .header(
             reqwest::header::ACCEPT,
             reqwest::header::HeaderValue::from_static("application/json"),
@@ -170,7 +172,7 @@ async fn fetch_nodeinfo_document(
     response.error_for_status_ref().map_err(|err| {
         error!(
             logger, "Failed to fetch NodeInfo: {}", err;
-            "http_error" => err.to_string(), "url" => url);
+            "http_error" => err.to_string(), "url" => url.to_string());
         err
     })?;
 
@@ -256,29 +258,27 @@ mod test {
 
     #[test]
     fn picks_highest_nodeinfo_version() {
-        assert_eq!(
-            pick_highest_supported_nodeinfo_version(&NodeInfoPointer { links: vec![] }),
-            None,
+        assert!(
+            pick_highest_supported_nodeinfo_version(&NodeInfoPointer { links: vec![] }).is_err()
         );
 
-        assert_eq!(
-            pick_highest_supported_nodeinfo_version(&NodeInfoPointer {
-                links: vec![NodeInfoPointerLink {
-                    rel: "http://nodeinfo.diaspora.software/ns/schema/2.2".to_string(),
-                    href: "first".to_string()
-                }],
-            }),
-            None,
-        );
+        assert!(pick_highest_supported_nodeinfo_version(&NodeInfoPointer {
+            links: vec![NodeInfoPointerLink {
+                rel: "http://nodeinfo.diaspora.software/ns/schema/2.2".to_string(),
+                href: "https://example.com/first".to_string()
+            }],
+        })
+        .is_err());
 
         assert_eq!(
             pick_highest_supported_nodeinfo_version(&NodeInfoPointer {
                 links: vec![NodeInfoPointerLink {
                     rel: "http://nodeinfo.diaspora.software/ns/schema/1.0".to_string(),
-                    href: "first".to_string()
+                    href: "https://example.com/first".to_string()
                 }],
-            }),
-            Some("first".to_string())
+            })
+            .unwrap(),
+            Url::parse("https://example.com/first").unwrap()
         );
 
         assert_eq!(
@@ -286,15 +286,16 @@ mod test {
                 links: vec![
                     NodeInfoPointerLink {
                         rel: "http://nodeinfo.diaspora.software/ns/schema/1.0".to_string(),
-                        href: "first".to_string()
+                        href: "https://example.org/first".into()
                     },
                     NodeInfoPointerLink {
                         rel: "http://nodeinfo.diaspora.software/ns/schema/2.1".to_string(),
-                        href: "2.1".to_string()
+                        href: "https://example.com/2.1".into()
                     }
                 ],
-            }),
-            Some("2.1".to_string())
+            })
+            .unwrap(),
+            Url::parse("https://example.com/2.1").unwrap()
         );
 
         assert_eq!(
@@ -302,15 +303,16 @@ mod test {
                 links: vec![
                     NodeInfoPointerLink {
                         rel: "http://nodeinfo.diaspora.software/ns/schema/2.0".to_string(),
-                        href: "highest is the first".to_string()
+                        href: "http://example.org/highest is the first".to_string()
                     },
                     NodeInfoPointerLink {
                         rel: "http://nodeinfo.diaspora.software/ns/schema/1.1".to_string(),
-                        href: "lowest is the second".to_string()
+                        href: "http://example.org/lowest is the second".to_string()
                     }
                 ],
-            }),
-            Some("highest is the first".to_string())
+            })
+            .unwrap(),
+            Url::parse("http://example.org/highest is the first").unwrap()
         );
     }
 
