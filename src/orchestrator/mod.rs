@@ -1,69 +1,18 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
-use rusqlite::{params, Connection};
 use slog::Logger;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 
+mod db;
 mod time;
 
 pub fn main(_logger: Logger) -> anyhow::Result<()> {
-    let db = init_database().context("Failed to initialize the database")?;
-    reschedule_missed_checks(db)?;
+    let conn = db::open()?;
+    db::init(&conn)?;
+    db::reschedule_missed_checks(&conn)?;
     run_checker("mastodon.social").context("Failed to check mastodon.social")
-}
-
-fn init_database() -> anyhow::Result<Connection> {
-    let conn = Connection::open("fediverse.observer.db")?;
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS states(
-            id INTEGER PRIMARY KEY NOT NULL,
-            state TEXT UNIQUE NOT NULL
-        )",
-        [],
-    )?;
-    conn.execute(
-        r#"INSERT OR IGNORE INTO states (id, state)
-        VALUES
-            (0, "discovered"),
-            (1, "alive"),
-            (2, "dying"),
-            (3, "dead"),
-            (4, "moving"),
-            (5, "moved")"#,
-        [],
-    )?;
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS instances(
-            id INTEGER PRIMARY KEY NOT NULL,
-            hostname TEXT UNIQUE NOT NULL,
-            state REFERENCES states(id) NOT NULL DEFAULT 0,
-            next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP
-        )",
-        [],
-    )?;
-    conn.execute(
-        r#"INSERT OR IGNORE INTO instances(hostname) VALUES ("mastodon.social")"#,
-        [],
-    )?;
-
-    Ok(conn)
-}
-
-fn reschedule_missed_checks(db: Connection) -> anyhow::Result<()> {
-    let mut statement =
-        db.prepare("SELECT id FROM instances WHERE next_check_datetime < CURRENT_TIMESTAMP")?;
-    let mut ids = statement.query([])?;
-    while let Some(row) = ids.next()? {
-        let instance_id: u64 = row.get(0)?;
-        db.execute(
-            "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
-            params![time::rand_datetime_daily()?, instance_id],
-        )?;
-    }
-    Ok(())
 }
 
 fn run_checker(target: &str) -> anyhow::Result<()> {
