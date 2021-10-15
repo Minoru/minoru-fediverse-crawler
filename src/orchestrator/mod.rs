@@ -110,16 +110,16 @@ fn run_checker(target: &str) -> anyhow::Result<()> {
     };
 
     match state {
-        ipc::CheckerResponse::Peer { hostname: _ } => {
+        ipc::CheckerResponse::Peer { peer: _ } => {
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
             ipc::InstanceState::Alive => process_peers(target, lines)?,
-            ipc::InstanceState::Moving { hostname } => {
-                println!("{} is moving to {}", target, hostname)
+            ipc::InstanceState::Moving { to } => {
+                println!("{} is moving to {}", target, to)
             }
-            ipc::InstanceState::Moved { hostname } => {
-                println!("{} has moved to {}", target, hostname)
+            ipc::InstanceState::Moved { to } => {
+                println!("{} has moved to {}", target, to)
             }
         },
     }
@@ -142,7 +142,7 @@ fn process_peers(
             ipc::CheckerResponse::State { state: _ } => {
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
-            ipc::CheckerResponse::Peer { hostname: _ } => peers_count += 1,
+            ipc::CheckerResponse::Peer { peer: _ } => peers_count += 1,
         }
     }
 

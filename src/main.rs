@@ -1,4 +1,5 @@
 use slog::{error, o, Drain, Logger};
+use url::Host;
 
 mod checker;
 mod ipc;
@@ -35,8 +36,10 @@ fn main() -> anyhow::Result<()> {
 fn logged_main(logger: Logger) -> anyhow::Result<()> {
     let args = parse_args()?;
     match args.host_to_check {
-        None => orchestrator::main(logger)?,
-        Some(host) => checker::main(logger, host)?,
+        None => orchestrator::main(logger),
+        Some(host) => {
+            let host = Host::parse(&host)?;
+            checker::main(logger, host)
+        }
     }
-    Ok(())
 }

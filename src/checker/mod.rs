@@ -5,17 +5,17 @@ use serde::Deserialize;
 use slog::{error, info, o, Logger};
 use std::time::Duration;
 use tokio::runtime::Runtime;
-use url::Url;
+use url::{Host, Url};
 
-pub fn main(logger: Logger, host: String) -> anyhow::Result<()> {
+pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
     let rt = Runtime::new()?;
     info!(logger, "Started Tokio runtime");
 
-    let logger = logger.new(o!("host" => host.clone()));
+    let logger = logger.new(o!("host" => host.to_string()));
     rt.block_on(async_main(&logger, &host))
 }
 
-async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
+async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
     let client = prepare_reqwest_client(logger)?;
@@ -31,7 +31,7 @@ async fn async_main(logger: &Logger, host: &str) -> anyhow::Result<()> {
     let peers = get_peers(logger, &client, host, &software).await?;
     info!(logger, "{} has {} peers", host, peers.len());
     for instance in peers {
-        let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { hostname: instance })?;
+        let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { peer: instance })?;
         println!("{}", peer);
     }
 
@@ -68,7 +68,7 @@ fn prepare_reqwest_client(logger: &Logger) -> anyhow::Result<Client> {
         .context("Failed to prepare a reqwest client")
 }
 
-async fn get_software(logger: &Logger, client: &Client, host: &str) -> anyhow::Result<String> {
+async fn get_software(logger: &Logger, client: &Client, host: &Host) -> anyhow::Result<String> {
     let nodeinfo = fetch_nodeinfo(logger, client, host).await?;
     json::parse(&nodeinfo)
         .map(|obj| obj["software"]["name"].to_string())
@@ -93,7 +93,7 @@ struct NodeInfoPointerLink {
     href: String,
 }
 
-async fn fetch_nodeinfo(logger: &Logger, client: &Client, host: &str) -> anyhow::Result<String> {
+async fn fetch_nodeinfo(logger: &Logger, client: &Client, host: &Host) -> anyhow::Result<String> {
     let pointer = fetch_nodeinfo_pointer(logger, client, host).await?;
     // TODO: add sanitization step that removes any links that point outside of the current host's
     // domain
@@ -109,7 +109,7 @@ async fn fetch_nodeinfo(logger: &Logger, client: &Client, host: &str) -> anyhow:
 async fn fetch_nodeinfo_pointer(
     logger: &Logger,
     client: &Client,
-    host: &str,
+    host: &Host,
 ) -> anyhow::Result<NodeInfoPointer> {
     let url = format!("https://{}/.well-known/nodeinfo", host);
     let response = client
@@ -208,9 +208,9 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
 async fn get_peers(
     logger: &Logger,
     client: &Client,
-    host: &str,
+    host: &Host,
     software: &str,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<Vec<Host>> {
     match software {
         "mastodon" | "pleroma" | "misskey" | "bookwyrm" => {
             get_peers_mastodonish(logger, client, host).await
@@ -222,8 +222,8 @@ async fn get_peers(
 async fn get_peers_mastodonish(
     logger: &Logger,
     client: &Client,
-    host: &str,
-) -> anyhow::Result<Vec<String>> {
+    host: &Host,
+) -> anyhow::Result<Vec<Host>> {
     let url = format!("https://{}/api/v1/instance/peers", host);
     let response = client
         .get(&url)
@@ -242,7 +242,12 @@ async fn get_peers_mastodonish(
     })?;
 
     // TODO: replace this with a parser that only processes the first megabyte of the response
-    Ok(response.json::<Vec<String>>().await?)
+    Ok(response
+        .json::<Vec<String>>()
+        .await?
+        .into_iter()
+        .map(Host::Domain)
+        .collect())
 }
 
 #[cfg(test)]

@@ -19,4 +19,4 @@ serde_json = "1"
 slog = "2"
 slog-journald = "2"
 tokio = { version = "1", features = [ "full" ] }
-url = "2"
+url = { version = "2", features = [ "serde" ] }

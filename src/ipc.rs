@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use url::Host;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum InstanceState {
@@ -6,10 +7,10 @@ pub enum InstanceState {
     Alive,
 
     /// The instance responded with a temporary redirect (HTTP codes 302, 303, 307).
-    Moving { hostname: String },
+    Moving { to: Host },
 
     /// The instance responded with a permanent redirect (HTTP codes 301, 308)
-    Moved { hostname: String },
+    Moved { to: Host },
 }
 
 /// Messages that the checker can send to the orchestrator.
@@ -19,5 +20,5 @@ pub enum CheckerResponse {
     State { state: InstanceState },
 
     /// The instance peers with another instance, which is located at `hostname`.
-    Peer { hostname: String },
+    Peer { peer: Host },
 }
