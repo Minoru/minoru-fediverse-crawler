@@ -21,7 +21,7 @@ fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
     let logger = logger.new(o!("host" => target.to_string()));
     if let Err(e) = run_checker(&logger, target) {
         db::open()
-            .and_then(|mut conn| db::reschedule(&logger, &mut conn, target))
+            .and_then(|mut conn| db::reschedule(&mut conn, target))
             .with_context(|| format!("While handling a checker error: {}", e))?;
     }
     Ok(())
@@ -55,7 +55,7 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
             let line = line.context("Failed to read a line of checker's response")?;
             serde_json::from_str(&line).context("Failed to deserialize checker's response")?
         } else {
-            return db::reschedule(logger, &mut conn, target);
+            return db::reschedule(&mut conn, target);
         }
     };
 
