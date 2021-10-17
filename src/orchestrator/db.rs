@@ -1,6 +1,6 @@
 use crate::orchestrator::time;
 use anyhow::{anyhow, Context};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, Transaction};
 use url::Host;
 
 /// Instance states which are stored in the DB.
@@ -66,6 +66,42 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )?;
 
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS alive_state_data(
+            id INTEGER PRIMARY KEY NOT NULL,
+            instance REFERENCES instances(id) NOT NULL UNIQUE,
+            last_alive_datetime INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS dying_state_data(
+            id INTEGER PRIMARY KEY NOT NULL,
+            instance REFERENCES instances(id) NOT NULL UNIQUE,
+            dying_since INTEGER NOT NULL,
+            failed_checks_count INTEGER NOT NULL DEFAULT 1
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS moving_state_data(
+            id INTEGER PRIMARY KEY NOT NULL,
+            instance REFERENCES instances(id) NOT NULL UNIQUE,
+            moving_since INTEGER NOT NULL,
+            redirects_count INTEGER NOT NULL DEFAULT 1,
+            moving_to REFERENCES instances(id) NOT NULL
+        )",
+        [],
+    )?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS moved_state_data(
+            id INTEGER PRIMARY KEY NOT NULL,
+            instance REFERENCES instances(id) NOT NULL UNIQUE,
+            moved_to REFERENCES instances(id) NOT NULL
+        )",
+        [],
+    )?;
+
     Ok(())
 }
 
@@ -83,8 +119,54 @@ pub fn reschedule_missed_checks(conn: &Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn mark_alive(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
-    Ok(())
+pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    let instance_id: u64 = tx.query_row(
+        "SELECT id FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )?;
+
+    // Delete any previous state data related to this instance
+    tx.execute(
+        "DELETE FROM dying_state_data
+        WHERE instance = ?1",
+        params![instance_id],
+    )?;
+    tx.execute(
+        "DELETE FROM moving_state_data
+        WHERE instance = ?1",
+        params![instance_id],
+    )?;
+    tx.execute(
+        "DELETE FROM moved_state_data
+        WHERE instance = ?1",
+        params![instance_id],
+    )?;
+
+    // Create/update alive state data
+    tx.execute(
+        "INSERT OR REPLACE
+        INTO alive_state_data(instance, last_alive_datetime)
+        VALUES (?1, CURRENT_TIMESTAMP)",
+        params![instance_id],
+    )?;
+
+    // Mark the instance alive and schedule the next check
+    tx.execute(
+        "UPDATE instances
+        SET state = ?1,
+            next_check_datetime = ?2
+        WHERE id = ?3",
+        params![
+            InstanceState::Alive as u8,
+            time::rand_datetime_daily()?,
+            instance_id
+        ],
+    )?;
+
+    Ok(tx.commit()?)
 }
 
 pub fn mark_dead(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
@@ -107,15 +189,7 @@ pub fn add_instance(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> 
 pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     let tx = conn.transaction()?;
 
-    let state = tx.query_row(
-        "SELECT state FROM instances WHERE hostname = ?1",
-        params![instance.to_string()],
-        |row| row.get(0),
-    )?;
-    let state = InstanceState::from(state)
-        .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))?;
-
-    let next_check_datetime = match state {
+    let next_check_datetime = match get_instance_state(&tx, instance)? {
         InstanceState::Discovered => time::rand_datetime_daily()?,
         InstanceState::Alive => time::rand_datetime_daily()?,
         InstanceState::Dying => time::rand_datetime_daily()?,
@@ -130,4 +204,14 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     )?;
 
     Ok(tx.commit()?)
+}
+
+fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<InstanceState> {
+    let state = tx.query_row(
+        "SELECT state FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )?;
+    InstanceState::from(state)
+        .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
 }
