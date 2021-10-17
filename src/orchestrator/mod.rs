@@ -1,6 +1,6 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
-use slog::Logger;
+use slog::{o, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -13,8 +13,18 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     let conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
-    run_checker(&logger, &Host::Domain("mastodon.social".to_owned()))
+    check(&logger, &Host::Domain("mastodon.social".to_owned()))
         .context("Failed to check mastodon.social")
+}
+
+fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
+    let logger = logger.new(o!("host" => target.to_string()));
+    if let Err(e) = run_checker(&logger, target) {
+        db::open()
+            .and_then(|mut conn| db::reschedule(&logger, &mut conn, target))
+            .with_context(|| format!("While handling a checker error: {}", e))?;
+    }
+    Ok(())
 }
 
 fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
@@ -38,12 +48,14 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
     let reader = BufReader::new(output);
     let mut lines = reader.lines();
 
+    let mut conn = db::open()?;
+
     let state = {
         if let Some(line) = lines.next() {
             let line = line.context("Failed to read a line of checker's response")?;
             serde_json::from_str(&line).context("Failed to deserialize checker's response")?
         } else {
-            return Ok(());
+            return db::reschedule(logger, &mut conn, target);
         }
     };
 
