@@ -9,15 +9,15 @@ use url::Host;
 mod db;
 mod time;
 
-pub fn main(_logger: Logger) -> anyhow::Result<()> {
+pub fn main(logger: Logger) -> anyhow::Result<()> {
     let conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
-    run_checker(&Host::Domain("mastodon.social".to_owned()))
+    run_checker(&logger, &Host::Domain("mastodon.social".to_owned()))
         .context("Failed to check mastodon.social")
 }
 
-fn run_checker(target: &Host) -> anyhow::Result<()> {
+fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
     let exe_path = env::args_os()
         .nth(0)
         .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
@@ -52,7 +52,7 @@ fn run_checker(target: &Host) -> anyhow::Result<()> {
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
-            ipc::InstanceState::Alive => process_peers(target, lines)?,
+            ipc::InstanceState::Alive => process_peers(logger, target, lines)?,
             ipc::InstanceState::Moving { to } => {
                 println!("{} is moving to {}", target, to)
             }
@@ -66,6 +66,7 @@ fn run_checker(target: &Host) -> anyhow::Result<()> {
 }
 
 fn process_peers(
+    _logger: &Logger,
     target: &Host,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
