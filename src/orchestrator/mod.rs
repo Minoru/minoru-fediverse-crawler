@@ -1,5 +1,6 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
+use rusqlite::Connection;
 use slog::{o, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
@@ -61,15 +62,21 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
 
     match state {
         ipc::CheckerResponse::Peer { peer: _ } => {
+            db::mark_dead(&conn, target)?;
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
-            ipc::InstanceState::Alive => process_peers(logger, target, lines)?,
+            ipc::InstanceState::Alive => {
+                db::mark_alive(&mut conn, target)?;
+                process_peers(logger, &conn, target, lines)?;
+            }
             ipc::InstanceState::Moving { to } => {
-                println!("{} is moving to {}", target, to)
+                println!("{} is moving to {}", target, to);
+                db::reschedule(&mut conn, target)?;
             }
             ipc::InstanceState::Moved { to } => {
-                println!("{} has moved to {}", target, to)
+                println!("{} has moved to {}", target, to);
+                db::mark_moved(&conn, target, &to)?;
             }
         },
     }
@@ -79,6 +86,7 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
 
 fn process_peers(
     _logger: &Logger,
+    conn: &Connection,
     target: &Host,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
@@ -93,7 +101,10 @@ fn process_peers(
             ipc::CheckerResponse::State { state: _ } => {
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
-            ipc::CheckerResponse::Peer { peer: _ } => peers_count += 1,
+            ipc::CheckerResponse::Peer { peer } => {
+                db::add_instance(&conn, &peer)?;
+                peers_count += 1;
+            }
         }
     }
 

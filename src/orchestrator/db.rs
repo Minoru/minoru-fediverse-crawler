@@ -83,6 +83,22 @@ pub fn reschedule_missed_checks(conn: &Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn mark_alive(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
+    Ok(())
+}
+
+pub fn mark_dead(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
+    Ok(())
+}
+
+pub fn mark_moved(_conn: &Connection, _instance: &Host, _to: &Host) -> anyhow::Result<()> {
+    Ok(())
+}
+
+pub fn add_instance(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
+    Ok(())
+}
+
 /// Reschedule the instance according to its state.
 ///
 /// This is meant to be used when the checker fails. In that case, we want to reschedule the
