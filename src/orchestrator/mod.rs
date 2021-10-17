@@ -56,13 +56,13 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
             let line = line.context("Failed to read a line of checker's response")?;
             serde_json::from_str(&line).context("Failed to deserialize checker's response")?
         } else {
-            return db::reschedule(&mut conn, target);
+            return db::mark_dead(&mut conn, target);
         }
     };
 
     match state {
         ipc::CheckerResponse::Peer { peer: _ } => {
-            db::mark_dead(&conn, target)?;
+            db::mark_dead(&mut conn, target)?;
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {

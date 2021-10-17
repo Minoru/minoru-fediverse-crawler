@@ -1,5 +1,6 @@
 use crate::orchestrator::time;
 use anyhow::{anyhow, Context};
+use chrono::{Duration, Utc};
 use rusqlite::{params, Connection, Transaction};
 use url::Host;
 
@@ -169,8 +170,112 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     Ok(tx.commit()?)
 }
 
-pub fn mark_dead(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
-    Ok(())
+pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    let instance_id: u64 = tx.query_row(
+        "SELECT id FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )?;
+
+    match get_instance_state(&tx, instance)? {
+        InstanceState::Discovered
+        | InstanceState::Alive
+        | InstanceState::Moving
+        | InstanceState::Moved => {
+            tx.execute(
+                "DELETE FROM alive_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+            tx.execute(
+                "DELETE FROM moving_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+            tx.execute(
+                "DELETE FROM moved_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+
+            tx.execute(
+                "INSERT
+                INTO dying_state_data(instance, dying_since)
+                VALUES (?1, CURRENT_TIMESTAMP)",
+                params![instance_id],
+            )?;
+            tx.execute(
+                "UPDATE instances
+                SET state = ?1,
+                    next_check_datetime = ?2
+                WHERE id = ?3",
+                params![
+                    InstanceState::Dying as u8,
+                    time::rand_datetime_daily()?,
+                    instance_id
+                ],
+            )?;
+        }
+        InstanceState::Dying => {
+            tx.execute(
+                "UPDATE dying_state_data
+                SET failed_checks_count = failed_checks_count + 1
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+            let (checks_count, since): (u64, chrono::DateTime<Utc>) = tx.query_row(
+                "SELECT failed_checks_count, dying_since
+                FROM dying_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+                |row| match (row.get(0), row.get(1)) {
+                    (Ok(a), Ok(b)) => Ok((a, b)),
+                    (Err(a), _) => Err(a),
+                    (_, Err(b)) => Err(b),
+                },
+            )?;
+            let week_ago = Utc::now()
+                .checked_sub_signed(Duration::weeks(1))
+                .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
+            if checks_count > 7 && since > week_ago {
+                tx.execute(
+                    "DELETE FROM dying_state_data
+                    WHERE instance = ?1",
+                    params![instance_id],
+                )?;
+                tx.execute(
+                    "UPDATE instances
+                    SET state = ?1,
+                        next_check_datetime = ?2
+                    WHERE id = ?3",
+                    params![
+                        InstanceState::Dead as u8,
+                        time::rand_datetime_weekly()?,
+                        instance_id
+                    ],
+                )?;
+            } else {
+                tx.execute(
+                    "UPDATE instances
+                    SET next_check_datetime = ?1
+                    WHERE id = ?2",
+                    params![time::rand_datetime_daily()?, instance_id],
+                )?;
+            }
+        }
+        InstanceState::Dead => {
+            tx.execute(
+                "UPDATE instances
+                SET next_check_datetime = ?1
+                WHERE id = ?2",
+                params![time::rand_datetime_weekly()?, instance_id],
+            )?;
+        }
+    }
+
+    Ok(tx.commit()?)
 }
 
 pub fn mark_moved(_conn: &Connection, _instance: &Host, _to: &Host) -> anyhow::Result<()> {
