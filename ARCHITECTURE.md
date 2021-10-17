@@ -176,16 +176,20 @@ concentrate the spider's requests at the victim host. There are two conceivable
 ways to do that: make a lot of DNS CNAMEs, or set up hosts that serve HTTP
 redirects to the victim.
 
+Thus, we follow redirects as long as they point to the same host, and stop when
+we encounter a new hostname.
+
 Mitigations:
 
 1. compare URLs from the NodeInfo with the hostname by which the NodeInfo was
    fetched. If they don't match, consider this host "dead". This means further
    checks will be made less often, making the DNS CNAMEs useless;
-2. when encountering HTTP 302 Moved Permanently, add the target to the list of
-   known instances, and check the old hostname as "dead";
-3. when encountering HTTP 302 Found, stop and re-schedule the check. Either the
-   redirect will disappear after a while, or the server will move for good and
-   the service will re-discover it.
+2. when encountering HTTP 302 Moved Permanently (which points to a new
+   hostname), add the target to the list of known instances, and check the old
+   hostname as "dead";
+3. when encountering HTTP 302 Found (which points to a new hostname), stop and
+   re-schedule the check. Either the redirect will disappear after a while, or
+   the server will move for good and the service will re-discover it.
 
 ## Architecture
 
