@@ -4,6 +4,7 @@ use slog::Logger;
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
+use url::Host;
 
 mod db;
 mod time;
@@ -12,17 +13,18 @@ pub fn main(_logger: Logger) -> anyhow::Result<()> {
     let conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
-    run_checker("mastodon.social").context("Failed to check mastodon.social")
+    run_checker(&Host::Domain("mastodon.social".to_owned()))
+        .context("Failed to check mastodon.social")
 }
 
-fn run_checker(target: &str) -> anyhow::Result<()> {
+fn run_checker(target: &Host) -> anyhow::Result<()> {
     let exe_path = env::args_os()
         .nth(0)
         .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
 
     let mut checker = Command::new(exe_path)
         .arg("--check")
-        .arg(target)
+        .arg(target.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -64,7 +66,7 @@ fn run_checker(target: &str) -> anyhow::Result<()> {
 }
 
 fn process_peers(
-    target: &str,
+    target: &Host,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
     let mut peers_count = 0;
