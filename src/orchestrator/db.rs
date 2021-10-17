@@ -114,7 +114,7 @@ pub fn reschedule_missed_checks(conn: &Connection) -> anyhow::Result<()> {
         let instance_id: u64 = row.get(0)?;
         conn.execute(
             "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
-            params![time::rand_datetime_daily()?, instance_id],
+            params![time::rand_datetime_today()?, instance_id],
         )?;
     }
     Ok(())
@@ -287,7 +287,7 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
         "INSERT OR IGNORE
         INTO instances(hostname, next_check_datetime)
         VALUES (?1, ?2)",
-        params![instance.to_string(), time::rand_datetime_daily()?],
+        params![instance.to_string(), time::rand_datetime_today()?],
     )?;
     Ok(())
 }
