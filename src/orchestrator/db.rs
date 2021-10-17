@@ -282,7 +282,13 @@ pub fn mark_moved(_conn: &Connection, _instance: &Host, _to: &Host) -> anyhow::R
     Ok(())
 }
 
-pub fn add_instance(_conn: &Connection, _instance: &Host) -> anyhow::Result<()> {
+pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE
+        INTO instances(hostname, next_check_datetime)
+        VALUES (?1, ?2)",
+        params![instance.to_string(), time::rand_datetime_daily()?],
+    )?;
     Ok(())
 }
 
