@@ -58,7 +58,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             id INTEGER PRIMARY KEY NOT NULL,
             hostname TEXT UNIQUE NOT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
-            next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP
+            next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP,
+            check_started INTEGER DEFAULT NULL
         )",
         [],
     )?;
@@ -103,6 +104,18 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )?;
 
+    Ok(())
+}
+
+/// If the server was stopped mid-way, some entries in the database can still be marked as "being
+/// checked". Remove those marks.
+pub fn disengage_previous_checks(conn: &Connection) -> anyhow::Result<()> {
+    conn.execute(
+        "UPDATE instances
+        SET check_started = NULL
+        WHERE check_started IS NOT NULL",
+        [],
+    )?;
     Ok(())
 }
 
@@ -471,4 +484,40 @@ fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<Insta
     )?;
     InstanceState::from(state)
         .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
+}
+
+pub fn pick_next_instance(conn: &mut Connection) -> anyhow::Result<Host> {
+    let tx = conn.transaction()?;
+
+    let (id, hostname): (u64, String) = tx.query_row(
+        "SELECT id, hostname
+        FROM instances
+        WHERE next_check_datetime < CURRENT_TIMESTAMP
+            AND check_started IS NULL",
+        [],
+        |row| match (row.get(0), row.get(1)) {
+            (Ok(a), Ok(b)) => Ok((a, b)),
+            (Err(a), _) => Err(a),
+            (_, Err(b)) => Err(b),
+        },
+    )?;
+    tx.execute(
+        "UPDATE instances
+        SET check_started = CURRENT_TIMESTAMP
+        WHERE id = ?1",
+        params![id],
+    )?;
+
+    tx.commit()?;
+    Ok(Host::Domain(hostname))
+}
+
+pub fn mark_checked(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+    conn.execute(
+        "UPDATE instances
+        SET check_started = NULL
+        WHERE hostname = ?1",
+        params![instance.to_string()],
+    )?;
+    Ok(())
 }

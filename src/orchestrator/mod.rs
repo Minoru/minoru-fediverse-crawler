@@ -11,11 +11,19 @@ mod db;
 mod time;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
-    let conn = db::open()?;
+    let mut conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
-    check(&logger, &Host::Domain("mastodon.social".to_owned()))
-        .context("Failed to check mastodon.social")
+    db::disengage_previous_checks(&conn)?;
+
+    // Wait a while for some checks to come due
+    std::thread::sleep(std::time::Duration::new(15, 0));
+
+    let instance = db::pick_next_instance(&mut conn).context("Picking an instance to check")?;
+    check(&logger, &instance)
+        .with_context(|| format!("Failed to check {}", instance.to_string()))?;
+    db::mark_checked(&conn, &instance)?;
+    Ok(())
 }
 
 fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
