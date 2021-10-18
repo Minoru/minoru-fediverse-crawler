@@ -1,10 +1,10 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{o, Logger};
+use slog::{error, o, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use url::Host;
 
 mod db;
@@ -56,7 +56,25 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
         .stderr(Stdio::null())
         .spawn()
         .context("Failed to spawn a checker")?;
+    let result = process_checker_response(logger, target, &mut checker);
 
+    if checker.try_wait().is_err() {
+        if let Err(e) = checker.kill() {
+            error!(logger, "Failed to kill the checker for {}: {}", target, e);
+        }
+        if let Err(e) = checker.try_wait() {
+            error!(logger, "The checker for {} survived the kill() somehow: {}", target, e);
+        }
+    }
+
+    result
+}
+
+fn process_checker_response(
+    logger: &Logger,
+    target: &Host,
+    checker: &mut Child,
+) -> anyhow::Result<()> {
     let output = checker
         .stdout
         .take()
