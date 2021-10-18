@@ -278,8 +278,154 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     Ok(tx.commit()?)
 }
 
-pub fn mark_moved(_conn: &Connection, _instance: &Host, _to: &Host) -> anyhow::Result<()> {
-    Ok(())
+pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    let instance_id: u64 = tx.query_row(
+        "SELECT id FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )?;
+
+    match get_instance_state(&tx, instance)? {
+        InstanceState::Discovered
+        | InstanceState::Alive
+        | InstanceState::Dying
+        | InstanceState::Dead => {
+            tx.execute(
+                "DELETE FROM alive_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+            tx.execute(
+                "DELETE FROM dying_state_data
+                WHERE instance = ?1",
+                params![instance_id],
+            )?;
+
+            tx.execute(
+                "INSERT OR IGNORE
+                INTO instances(hostname, next_check_datetime)
+                VALUES (?1, ?2)",
+                params![to.to_string(), time::rand_datetime_today()?],
+            )?;
+            let to_instance_id: u64 = tx.query_row(
+                "SELECT id FROM instances WHERE hostname = ?1",
+                params![to.to_string()],
+                |row| row.get(0),
+            )?;
+
+            tx.execute(
+                "INSERT INTO moving_state_data(instance, moving_since, moving_to)
+                VALUES (?1, CURRENT_TIMESTAMP, ?2)",
+                params![instance_id, to_instance_id],
+            )?;
+            tx.execute(
+                "UPDATE instances
+                SET state = ?1,
+                    next_check_datetime = ?2
+                WHERE id = ?3",
+                params![
+                    InstanceState::Moving as u8,
+                    time::rand_datetime_daily()?,
+                    instance_id
+                ],
+            )?;
+        }
+        InstanceState::Moving => {
+            let to_instance_id: u64 = tx.query_row(
+                "SELECT id FROM instances WHERE hostname = ?1",
+                params![to.to_string()],
+                |row| row.get(0),
+            )?;
+            let is_moving_to_that_host_already: u64 = tx.query_row(
+                "SELECT count(id) FROM moving_state_data WHERE instance = ?1 AND moving_to = ?2",
+                params![instance_id, to_instance_id],
+                |row| row.get(0),
+            )?;
+            if is_moving_to_that_host_already > 0 {
+                // We're being redirected to the same host as before; update the counts
+                tx.execute(
+                    "UPDATE moving_state_data
+                    SET redirects_count = redirects_count + 1
+                    WHERE instance = ?1",
+                    params![instance_id],
+                )?;
+
+                // If the instance is in "moving" state for over a week, consider it moved
+                let (redirects_count, since): (u64, chrono::DateTime<Utc>) = tx.query_row(
+                    "SELECT redirects_count, moving_since
+                    FROM moving_state_data
+                    WHERE instance = ?1",
+                    params![instance_id],
+                    |row| match (row.get(0), row.get(1)) {
+                        (Ok(a), Ok(b)) => Ok((a, b)),
+                        (Err(a), _) => Err(a),
+                        (_, Err(b)) => Err(b),
+                    },
+                )?;
+                let week_ago = Utc::now()
+                    .checked_sub_signed(Duration::weeks(1))
+                    .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
+                if redirects_count > 7 && since > week_ago {
+                    tx.execute(
+                        "DELETE FROM moving_state_data
+                        WHERE instance = ?1",
+                        params![instance_id],
+                    )?;
+                    tx.execute(
+                        "INSERT INTO moved_state_data(instance, moved_to)
+                        VALUES (?1, ?2)",
+                        params![instance_id, to_instance_id],
+                    )?;
+                    tx.execute(
+                        "UPDATE instances
+                        SET state = ?1,
+                            next_check_datetime = ?2
+                        WHERE id = ?3",
+                        params![
+                            InstanceState::Moved as u8,
+                            time::rand_datetime_weekly()?,
+                            instance_id
+                        ],
+                    )?;
+                } else {
+                    tx.execute(
+                        "UPDATE instances
+                        SET next_check_datetime = ?1
+                        WHERE id = ?2",
+                        params![time::rand_datetime_daily()?, instance_id],
+                    )?;
+                }
+            } else {
+                // Previous checks got redirected to another host; restart the counts
+                tx.execute(
+                    "UPDATE moving_state_data
+                    SET moving_since = CURRENT_TIMESTAMP,
+                        redirects_count = 1,
+                        moving_to = ?1
+                    WHERE instance = ?2",
+                    params![to_instance_id, instance_id],
+                )?;
+                tx.execute(
+                    "UPDATE instances
+                    SET next_check_datetime = ?1
+                    WHERE id = ?2",
+                    params![time::rand_datetime_daily()?, instance_id],
+                )?;
+            }
+        }
+        InstanceState::Moved => {
+            tx.execute(
+                "UPDATE instances
+                SET next_check_datetime = ?1
+                WHERE id = ?2",
+                params![time::rand_datetime_weekly()?, instance_id],
+            )?;
+        }
+    };
+
+    Ok(tx.commit()?)
 }
 
 pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {

@@ -76,7 +76,7 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
             }
             ipc::InstanceState::Moved { to } => {
                 println!("{} has moved to {}", target, to);
-                db::mark_moved(&conn, target, &to)?;
+                db::mark_moved(&mut conn, target, &to)?;
             }
         },
     }
