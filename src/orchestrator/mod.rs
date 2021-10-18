@@ -1,5 +1,5 @@
 use anyhow::Context;
-use slog::Logger;
+use slog::{o, Logger};
 
 mod checker_handle;
 mod db;
@@ -8,7 +8,7 @@ mod time;
 use checker_handle::CheckerHandle;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
-    let mut conn = db::open()?;
+    let conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
     db::disengage_previous_checks(&conn)?;
@@ -19,7 +19,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         {
             println!("Checking {}", instance);
 
-            CheckerHandle::new(&mut conn, &logger, &instance)?.run()?;
+            let logger = logger.new(o!("host" => instance.to_string()));
+            CheckerHandle::new(logger, instance)?.run()?;
         } else {
             println!("Waiting for some checks to come due...");
             std::thread::sleep(std::time::Duration::new(1, 0));

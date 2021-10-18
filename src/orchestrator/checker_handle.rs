@@ -1,7 +1,7 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{error, o, Logger};
+use slog::{error, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -9,19 +9,16 @@ use url::Host;
 
 use crate::orchestrator::db;
 
-pub struct CheckerHandle<'a> {
-    conn: &'a mut Connection,
-    logger: &'a Logger,
-    instance: &'a Host,
+pub struct CheckerHandle {
+    conn: Connection,
+    logger: Logger,
+    instance: Host,
 }
 
-impl<'a> CheckerHandle<'a> {
-    pub fn new(
-        conn: &'a mut Connection,
-        logger: &'a Logger,
-        instance: &'a Host,
-    ) -> anyhow::Result<Self> {
-        db::start_checking(conn, instance)?;
+impl CheckerHandle {
+    pub fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
+        let conn = db::open()?;
+        db::start_checking(&conn, &instance)?;
         Ok(CheckerHandle {
             conn,
             logger,
@@ -30,14 +27,14 @@ impl<'a> CheckerHandle<'a> {
     }
 
     pub fn run(&self) -> anyhow::Result<()> {
-        check(self.logger, self.instance)
+        check(&self.logger, &self.instance)
             .with_context(|| format!("Failed to check {}", self.instance.to_string()))
     }
 }
 
-impl<'a> Drop for CheckerHandle<'a> {
+impl Drop for CheckerHandle {
     fn drop(&mut self) {
-        if let Err(e) = db::finish_checking(self.conn, self.instance) {
+        if let Err(e) = db::finish_checking(&self.conn, &self.instance) {
             error!(
                 self.logger,
                 "Error marking {} as checked in the DB: {}",
@@ -49,8 +46,7 @@ impl<'a> Drop for CheckerHandle<'a> {
 }
 
 fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
-    let logger = logger.new(o!("host" => target.to_string()));
-    if let Err(e) = run_checker(&logger, target) {
+    if let Err(e) = run_checker(logger, target) {
         db::open()
             .and_then(|mut conn| db::reschedule(&mut conn, target))
             .with_context(|| format!("While handling a checker error: {}", e))?;
