@@ -9,30 +9,82 @@ use url::Host;
 
 use crate::orchestrator::db;
 
-pub struct CheckerHandle {
-    conn: Connection,
+struct CheckerHandle {
+    inner: Child,
     logger: Logger,
     instance: Host,
 }
 
 impl CheckerHandle {
+    fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
+        let exe_path = env::args_os()
+            .next()
+            .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
+
+        let inner = Command::new(exe_path)
+            .arg("--check")
+            .arg(instance.to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("Failed to spawn a checker")?;
+
+        Ok(Self {
+            inner,
+            logger,
+            instance,
+        })
+    }
+}
+
+impl Drop for CheckerHandle {
+    fn drop(&mut self) {
+        if self.inner.try_wait().is_err() {
+            if let Err(e) = self.inner.kill() {
+                error!(
+                    self.logger,
+                    "Failed to kill the checker for {}: {}", self.instance, e
+                );
+            }
+            if let Err(e) = self.inner.try_wait() {
+                error!(
+                    self.logger,
+                    "The checker for {} survived the kill() somehow: {}", self.instance, e
+                );
+            }
+        }
+    }
+}
+
+pub struct InstanceChecker {
+    conn: Connection,
+    logger: Logger,
+    instance: Host,
+}
+
+impl InstanceChecker {
     pub fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
         let conn = db::open()?;
         db::start_checking(&conn, &instance)?;
-        Ok(CheckerHandle {
+        Ok(Self {
             conn,
             logger,
             instance,
         })
     }
 
-    pub fn run(&self) -> anyhow::Result<()> {
-        check(&self.logger, &self.instance)
-            .with_context(|| format!("Failed to check {}", self.instance.to_string()))
+    pub fn run(&mut self) -> anyhow::Result<()> {
+        let mut checker = CheckerHandle::new(self.logger.clone(), self.instance.clone())?;
+        if let Err(e) = process_checker_response(&self.logger, &self.instance, &mut checker.inner) {
+            db::reschedule(&mut self.conn, &self.instance)
+                .with_context(|| format!("While handling a checker error: {}", e))?;
+        }
+        Ok(())
     }
 }
 
-impl Drop for CheckerHandle {
+impl Drop for InstanceChecker {
     fn drop(&mut self) {
         if let Err(e) = db::finish_checking(&self.conn, &self.instance) {
             error!(
@@ -43,45 +95,6 @@ impl Drop for CheckerHandle {
             );
         }
     }
-}
-
-fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
-    if let Err(e) = run_checker(logger, target) {
-        db::open()
-            .and_then(|mut conn| db::reschedule(&mut conn, target))
-            .with_context(|| format!("While handling a checker error: {}", e))?;
-    }
-    Ok(())
-}
-
-fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
-    let exe_path = env::args_os()
-        .next()
-        .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
-
-    let mut checker = Command::new(exe_path)
-        .arg("--check")
-        .arg(target.to_string())
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .context("Failed to spawn a checker")?;
-    let result = process_checker_response(logger, target, &mut checker);
-
-    if checker.try_wait().is_err() {
-        if let Err(e) = checker.kill() {
-            error!(logger, "Failed to kill the checker for {}: {}", target, e);
-        }
-        if let Err(e) = checker.try_wait() {
-            error!(
-                logger,
-                "The checker for {} survived the kill() somehow: {}", target, e
-            );
-        }
-    }
-
-    result
 }
 
 fn process_checker_response(

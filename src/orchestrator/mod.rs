@@ -1,11 +1,11 @@
 use anyhow::Context;
 use slog::{o, Logger};
 
-mod checker_handle;
 mod db;
+mod instance_checker;
 mod time;
 
-use checker_handle::CheckerHandle;
+use instance_checker::InstanceChecker;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let conn = db::open()?;
@@ -20,7 +20,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
             println!("Checking {}", instance);
 
             let logger = logger.new(o!("host" => instance.to_string()));
-            CheckerHandle::new(logger, instance)?.run()?;
+            InstanceChecker::new(logger, instance)?.run()?;
         } else {
             println!("Waiting for some checks to come due...");
             std::thread::sleep(std::time::Duration::new(1, 0));
