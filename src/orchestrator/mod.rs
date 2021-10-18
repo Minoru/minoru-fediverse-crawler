@@ -30,7 +30,7 @@ fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
 
 fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
     let exe_path = env::args_os()
-        .nth(0)
+        .next()
         .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
 
     let mut checker = Command::new(exe_path)
@@ -102,7 +102,7 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::add_instance(&conn, &peer)?;
+                db::add_instance(conn, &peer)?;
                 peers_count += 1;
             }
         }

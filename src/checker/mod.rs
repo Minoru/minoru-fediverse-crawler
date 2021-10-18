@@ -129,7 +129,7 @@ async fn fetch_nodeinfo_pointer(
 
 fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow::Result<Url> {
     // This array in the ascending order of schema versions.
-    const SUPPORTED_NODEINFO_SCHEMAS: [&'static str; 4] = [
+    const SUPPORTED_NODEINFO_SCHEMAS: [&str; 4] = [
         "http://nodeinfo.diaspora.software/ns/schema/1.0",
         "http://nodeinfo.diaspora.software/ns/schema/1.1",
         "http://nodeinfo.diaspora.software/ns/schema/2.0",
