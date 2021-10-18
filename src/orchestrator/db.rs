@@ -1,7 +1,7 @@
 use crate::orchestrator::time;
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
-use rusqlite::{params, Connection, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use url::Host;
 
 /// Instance states which are stored in the DB.
@@ -486,33 +486,31 @@ fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<Insta
         .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
 }
 
-pub fn pick_next_instance(conn: &mut Connection) -> anyhow::Result<Host> {
-    let tx = conn.transaction()?;
-
-    let (id, hostname): (u64, String) = tx.query_row(
-        "SELECT id, hostname
+pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<Option<Host>> {
+    let hostname = conn
+        .query_row(
+            "SELECT hostname
         FROM instances
         WHERE next_check_datetime < CURRENT_TIMESTAMP
             AND check_started IS NULL",
-        [],
-        |row| match (row.get(0), row.get(1)) {
-            (Ok(a), Ok(b)) => Ok((a, b)),
-            (Err(a), _) => Err(a),
-            (_, Err(b)) => Err(b),
-        },
-    )?;
-    tx.execute(
-        "UPDATE instances
-        SET check_started = CURRENT_TIMESTAMP
-        WHERE id = ?1",
-        params![id],
-    )?;
-
-    tx.commit()?;
-    Ok(Host::Domain(hostname))
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(hostname.map(Host::Domain))
 }
 
-pub fn mark_checked(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+pub fn start_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+    conn.execute(
+        "UPDATE instances
+        SET check_started = CURRENT_TIMESTAMP
+        WHERE hostname = ?1",
+        params![instance.to_string()],
+    )?;
+    Ok(())
+}
+
+pub fn finish_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     conn.execute(
         "UPDATE instances
         SET check_started = NULL

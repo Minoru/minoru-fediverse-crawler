@@ -11,18 +11,28 @@ mod db;
 mod time;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
-    let mut conn = db::open()?;
+    let conn = db::open()?;
     db::init(&conn)?;
     db::reschedule_missed_checks(&conn)?;
     db::disengage_previous_checks(&conn)?;
 
-    // Wait a while for some checks to come due
-    std::thread::sleep(std::time::Duration::new(15, 0));
+    loop {
+        if let Some(instance) =
+            db::pick_next_instance(&conn).context("Picking an instance to check")?
+        {
+            println!("Checking {}", instance);
 
-    let instance = db::pick_next_instance(&mut conn).context("Picking an instance to check")?;
-    check(&logger, &instance)
-        .with_context(|| format!("Failed to check {}", instance.to_string()))?;
-    db::mark_checked(&conn, &instance)?;
+            db::start_checking(&conn, &instance)?;
+            check(&logger, &instance)
+                .with_context(|| format!("Failed to check {}", instance.to_string()))?;
+            db::finish_checking(&conn, &instance)?;
+            break;
+        } else {
+            println!("Waiting for some checks to come due...");
+            std::thread::sleep(std::time::Duration::new(1, 0));
+        }
+    }
+
     Ok(())
 }
 
