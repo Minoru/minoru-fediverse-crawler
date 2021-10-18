@@ -57,6 +57,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         "CREATE TABLE IF NOT EXISTS instances(
             id INTEGER PRIMARY KEY NOT NULL,
             hostname TEXT UNIQUE NOT NULL,
+            discovered_datetime INTEGER NOT NULL,
+            discovered_via REFERENCES instances(id) DEFAULT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
             last_check_datetime INTEGER DEFAULT NULL,
             next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP,
@@ -65,7 +67,9 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )?;
     conn.execute(
-        r#"INSERT OR IGNORE INTO instances(hostname) VALUES ("mastodon.social")"#,
+        r#"INSERT OR IGNORE
+        INTO instances(hostname, discovered_datetime)
+        VALUES ("mastodon.social", CURRENT_TIMESTAMP)"#,
         [],
     )?;
 
@@ -327,9 +331,14 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
 
             tx.execute(
                 "INSERT OR IGNORE
-                INTO instances(hostname, next_check_datetime)
-                VALUES (?1, ?2)",
-                params![to.to_string(), time::rand_datetime_today()?],
+                INTO instances(hostname, discovered_datetime, discovered_via, next_check_datetime)
+                VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    to.to_string(),
+                    now,
+                    instance_id,
+                    time::rand_datetime_today()?
+                ],
             )?;
             let to_instance_id: u64 = tx.query_row(
                 "SELECT id FROM instances WHERE hostname = ?1",
@@ -457,14 +466,32 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
     Ok(tx.commit()?)
 }
 
-pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    conn.execute(
-        "INSERT OR IGNORE
-        INTO instances(hostname, next_check_datetime)
-        VALUES (?1, ?2)",
-        params![instance.to_string(), time::rand_datetime_today()?],
+pub fn add_instance(
+    conn: &mut Connection,
+    source_instance: &Host,
+    instance: &Host,
+) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    let now = Utc::now();
+    let source_instance_id: u64 = tx.query_row(
+        "SELECT id FROM instances WHERE hostname = ?1",
+        params![source_instance.to_string()],
+        |row| row.get(0),
     )?;
-    Ok(())
+    tx.execute(
+        "INSERT OR IGNORE
+        INTO instances(hostname, discovered_datetime, discovered_via, next_check_datetime)
+        VALUES (?1, ?2, ?3, ?4)",
+        params![
+            instance.to_string(),
+            now,
+            source_instance_id,
+            time::rand_datetime_today()?
+        ],
+    )?;
+
+    Ok(tx.commit()?)
 }
 
 /// Reschedule the instance according to its state.

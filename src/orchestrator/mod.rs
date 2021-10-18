@@ -83,7 +83,7 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
         ipc::CheckerResponse::State { state } => match state {
             ipc::InstanceState::Alive => {
                 db::mark_alive(&mut conn, target)?;
-                process_peers(logger, &conn, target, lines)?;
+                process_peers(logger, &mut conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
                 println!("{} is moving to {}", target, to);
@@ -101,7 +101,7 @@ fn run_checker(logger: &Logger, target: &Host) -> anyhow::Result<()> {
 
 fn process_peers(
     _logger: &Logger,
-    conn: &Connection,
+    conn: &mut Connection,
     target: &Host,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
@@ -117,7 +117,7 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::add_instance(conn, &peer)?;
+                db::add_instance(conn, target, &peer)?;
                 peers_count += 1;
             }
         }
