@@ -26,14 +26,11 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
             check(&logger, &instance)
                 .with_context(|| format!("Failed to check {}", instance.to_string()))?;
             db::finish_checking(&conn, &instance)?;
-            break;
         } else {
             println!("Waiting for some checks to come due...");
             std::thread::sleep(std::time::Duration::new(1, 0));
         }
     }
-
-    Ok(())
 }
 
 fn check(logger: &Logger, target: &Host) -> anyhow::Result<()> {
