@@ -9,10 +9,25 @@ use url::Host;
 
 use crate::orchestrator::db;
 
+fn try_pick_next_instance(conn: &mut Connection) -> Option<Host> {
+    const MAX_TRIES: u8 = 5;
+    const MIN_SLEEP_MS: u64 = 10;
+    const MAX_SLEEP_MS: u64 = 5000;
+    for _ in 1..=MAX_TRIES {
+        if let Some(instance) = db::pick_next_instance(conn) {
+            return Some(instance);
+        }
+        let sleep_ms = fastrand::u64(MIN_SLEEP_MS..MAX_SLEEP_MS);
+        std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
+    }
+
+    None
+}
+
 pub fn run(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     loop {
-        if let Some(instance) = db::pick_next_instance(&mut conn) {
+        if let Some(instance) = try_pick_next_instance(&mut conn) {
             println!("Checking {}", instance);
 
             let logger = logger.new(o!("host" => instance.to_string()));
@@ -30,8 +45,7 @@ pub fn run(logger: Logger) -> anyhow::Result<()> {
                 return result;
             }
         } else {
-            println!("Waiting for some checks to come due...");
-            std::thread::sleep(std::time::Duration::new(1, 0));
+            return Ok(());
         }
     }
 }

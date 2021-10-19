@@ -543,6 +543,7 @@ pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
                 FROM instances
                 WHERE next_check_datetime < CURRENT_TIMESTAMP
                 AND check_started IS NULL
+                ORDER BY random()
                 LIMIT 1",
                 [],
                 |row| {
@@ -580,4 +581,15 @@ pub fn finish_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()>
         params![instance.to_string()],
     )?;
     Ok(())
+}
+
+pub fn outstanding_checks_count(conn: &Connection) -> anyhow::Result<u64> {
+    Ok(conn.query_row(
+        "SELECT count(id)
+        FROM instances
+        WHERE next_check_datetime < CURRENT_TIMESTAMP
+            AND check_started IS NULL",
+        [],
+        |row| row.get(0),
+    )?)
 }
