@@ -529,28 +529,47 @@ fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<Insta
         .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
 }
 
-pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<Option<Host>> {
-    let hostname = conn
-        .query_row(
-            "SELECT hostname
-            FROM instances
-            WHERE next_check_datetime < CURRENT_TIMESTAMP
-            AND check_started IS NULL",
-            [],
-            |row| row.get(0),
-        )
-        .optional()?;
-    Ok(hostname.map(Host::Domain))
-}
+/// Picks the next instance to check, marks it as "being checked" in the database, and returns its
+/// hostname.
+///
+/// The user has to call `finish_checking()` to un-mark the instance when the check is done.
+pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
+    let mut get_hostname = || -> rusqlite::Result<Option<Host>> {
+        let tx = conn.transaction()?;
 
-pub fn start_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    conn.execute(
-        "UPDATE instances
-        SET check_started = CURRENT_TIMESTAMP
-        WHERE hostname = ?1",
-        params![instance.to_string()],
-    )?;
-    Ok(())
+        let result: Option<(u64, String)> = tx
+            .query_row(
+                "SELECT id, hostname
+                FROM instances
+                WHERE next_check_datetime < CURRENT_TIMESTAMP
+                AND check_started IS NULL
+                LIMIT 1",
+                [],
+                |row| {
+                    let id = row.get(0)?;
+                    let hostname = row.get(1)?;
+                    Ok((id, hostname))
+                },
+            )
+            .optional()?;
+
+        let (id, hostname) = match result {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        tx.execute(
+            "UPDATE instances
+            SET check_started = CURRENT_TIMESTAMP
+            WHERE id = ?1",
+            params![id],
+        )?;
+
+        tx.commit()?;
+        Ok(Some(Host::Domain(hostname)))
+    };
+
+    get_hostname().ok().flatten()
 }
 
 pub fn finish_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()> {

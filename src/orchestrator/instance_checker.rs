@@ -10,15 +10,25 @@ use url::Host;
 use crate::orchestrator::db;
 
 pub fn run(logger: Logger) -> anyhow::Result<()> {
-    let conn = db::open()?;
+    let mut conn = db::open()?;
     loop {
-        if let Some(instance) =
-            db::pick_next_instance(&conn).context("Picking an instance to check")?
-        {
+        if let Some(instance) = db::pick_next_instance(&mut conn) {
             println!("Checking {}", instance);
 
             let logger = logger.new(o!("host" => instance.to_string()));
-            InstanceChecker::new(logger, instance)?.run()?;
+
+            let result = check(logger.clone(), &mut conn, &instance);
+            if let Err(e) = db::finish_checking(&conn, &instance) {
+                error!(
+                    logger,
+                    "Error marking {} as checked in the DB: {}",
+                    instance.to_string(),
+                    e
+                );
+            }
+            if result.is_err() {
+                return result;
+            }
         } else {
             println!("Waiting for some checks to come due...");
             std::thread::sleep(std::time::Duration::new(1, 0));
@@ -74,48 +84,18 @@ impl Drop for CheckerHandle {
     }
 }
 
-pub struct InstanceChecker {
-    conn: Connection,
-    logger: Logger,
-    instance: Host,
-}
-
-impl InstanceChecker {
-    pub fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
-        let conn = db::open()?;
-        db::start_checking(&conn, &instance)?;
-        Ok(Self {
-            conn,
-            logger,
-            instance,
-        })
+fn check(logger: Logger, conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+    let mut checker = CheckerHandle::new(logger.clone(), instance.clone())?;
+    if let Err(e) = process_checker_response(&logger, conn, instance, &mut checker.inner) {
+        db::reschedule(conn, instance)
+            .with_context(|| format!("While handling a checker error: {}", e))?;
     }
-
-    pub fn run(&mut self) -> anyhow::Result<()> {
-        let mut checker = CheckerHandle::new(self.logger.clone(), self.instance.clone())?;
-        if let Err(e) = process_checker_response(&self.logger, &self.instance, &mut checker.inner) {
-            db::reschedule(&mut self.conn, &self.instance)
-                .with_context(|| format!("While handling a checker error: {}", e))?;
-        }
-        Ok(())
-    }
-}
-
-impl Drop for InstanceChecker {
-    fn drop(&mut self) {
-        if let Err(e) = db::finish_checking(&self.conn, &self.instance) {
-            error!(
-                self.logger,
-                "Error marking {} as checked in the DB: {}",
-                self.instance.to_string(),
-                e
-            );
-        }
-    }
+    Ok(())
 }
 
 fn process_checker_response(
     logger: &Logger,
+    conn: &mut Connection,
     target: &Host,
     checker: &mut Child,
 ) -> anyhow::Result<()> {
@@ -126,34 +106,32 @@ fn process_checker_response(
     let reader = BufReader::new(output);
     let mut lines = reader.lines();
 
-    let mut conn = db::open()?;
-
     let state = {
         if let Some(line) = lines.next() {
             let line = line.context("Failed to read a line of checker's response")?;
             serde_json::from_str(&line).context("Failed to deserialize checker's response")?
         } else {
-            return db::mark_dead(&mut conn, target);
+            return db::mark_dead(conn, target);
         }
     };
 
     match state {
         ipc::CheckerResponse::Peer { peer: _ } => {
-            db::mark_dead(&mut conn, target)?;
+            db::mark_dead(conn, target)?;
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
             ipc::InstanceState::Alive => {
-                db::mark_alive(&mut conn, target)?;
-                process_peers(logger, &mut conn, target, lines)?;
+                db::mark_alive(conn, target)?;
+                process_peers(logger, conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
                 println!("{} is moving to {}", target, to);
-                db::reschedule(&mut conn, target)?;
+                db::reschedule(conn, target)?;
             }
             ipc::InstanceState::Moved { to } => {
                 println!("{} has moved to {}", target, to);
-                db::mark_moved(&mut conn, target, &to)?;
+                db::mark_moved(conn, target, &to)?;
             }
         },
     }
