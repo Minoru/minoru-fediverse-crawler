@@ -72,6 +72,10 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         VALUES ("mastodon.social", CURRENT_TIMESTAMP)"#,
         [],
     )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS instances_next_check_datetime_idx
+        ON instances(next_check_datetime)", []
+        )?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS alive_state_data(
