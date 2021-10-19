@@ -1,13 +1,30 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{error, Logger};
+use slog::{error, o, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use url::Host;
 
 use crate::orchestrator::db;
+
+pub fn run(logger: Logger) -> anyhow::Result<()> {
+    let conn = db::open()?;
+    loop {
+        if let Some(instance) =
+            db::pick_next_instance(&conn).context("Picking an instance to check")?
+        {
+            println!("Checking {}", instance);
+
+            let logger = logger.new(o!("host" => instance.to_string()));
+            InstanceChecker::new(logger, instance)?.run()?;
+        } else {
+            println!("Waiting for some checks to come due...");
+            std::thread::sleep(std::time::Duration::new(1, 0));
+        }
+    }
+}
 
 struct CheckerHandle {
     inner: Child,
