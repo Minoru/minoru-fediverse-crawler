@@ -372,7 +372,10 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 |row| row.get(0),
             )?;
             let is_moving_to_that_host_already: u64 = tx.query_row(
-                "SELECT count(id) FROM moving_state_data WHERE instance = ?1 AND moving_to = ?2",
+                "SELECT count(id)
+                FROM moving_state_data
+                WHERE instance = ?1
+                    AND moving_to = ?2",
                 params![instance_id, to_instance_id],
                 |row| row.get(0),
             )?;
@@ -475,7 +478,9 @@ pub fn add_instance(
 
     let now = Utc::now();
     let source_instance_id: u64 = tx.query_row(
-        "SELECT id FROM instances WHERE hostname = ?1",
+        "SELECT id
+        FROM instances
+        WHERE hostname = ?1",
         params![source_instance.to_string()],
         |row| row.get(0),
     )?;
@@ -512,7 +517,9 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     };
 
     tx.execute(
-        "UPDATE instances SET next_check_datetime = ?1 WHERE hostname = ?2",
+        "UPDATE instances
+        SET next_check_datetime = ?1
+        WHERE hostname = ?2",
         params![next_check_datetime, instance.to_string()],
     )?;
 
@@ -542,7 +549,7 @@ pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
                 "SELECT id, hostname
                 FROM instances
                 WHERE next_check_datetime < CURRENT_TIMESTAMP
-                AND check_started IS NULL
+                    AND check_started IS NULL
                 ORDER BY random()
                 LIMIT 1",
                 [],
