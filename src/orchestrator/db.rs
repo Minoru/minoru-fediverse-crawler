@@ -63,7 +63,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             discovered_via REFERENCES instances(id) DEFAULT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
             last_check_datetime INTEGER DEFAULT NULL,
-            next_check_datetime INTEGER DEFAULT CURRENT_TIMESTAMP,
+            next_check_datetime INTEGER DEFAULT (strftime('%s', CURRENT_TIMESTAMP)),
             check_started INTEGER DEFAULT NULL
         )",
         [],
@@ -72,7 +72,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
     conn.execute(
         r#"INSERT OR IGNORE
         INTO instances(hostname, discovered_datetime)
-        VALUES ("mastodon.social", CURRENT_TIMESTAMP)"#,
+        VALUES ("mastodon.social", strftime('%s', CURRENT_TIMESTAMP))"#,
         [],
     )
     .context("Adding mastodon.social to the instances table")?;
@@ -138,14 +138,17 @@ pub fn disengage_previous_checks(conn: &Connection) -> anyhow::Result<()> {
 }
 
 pub fn reschedule_missed_checks(conn: &Connection) -> anyhow::Result<()> {
-    let mut statement =
-        conn.prepare("SELECT id FROM instances WHERE next_check_datetime < CURRENT_TIMESTAMP")?;
+    let mut statement = conn.prepare(
+        "SELECT id
+            FROM instances
+            WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)",
+    )?;
     let mut ids = statement.query([])?;
     while let Some(row) = ids.next()? {
         let instance_id: u64 = row.get(0)?;
         conn.execute(
             "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
-            params![time::rand_datetime_today()?, instance_id],
+            params![time::rand_datetime_today()?.timestamp(), instance_id],
         )?;
     }
     Ok(())
@@ -189,12 +192,12 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     tx.execute(
         "UPDATE instances
         SET state = ?1,
-            last_check_datetime = CURRENT_TIMESTAMP,
+            last_check_datetime = strftime('%s', CURRENT_TIMESTAMP),
             next_check_datetime = ?2
         WHERE id = ?3",
         params![
             InstanceState::Alive as u8,
-            time::rand_datetime_daily()?,
+            time::rand_datetime_daily()?.timestamp(),
             instance_id
         ],
     )?;
@@ -247,8 +250,8 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 WHERE id = ?4",
                 params![
                     InstanceState::Dying as u8,
-                    now,
-                    time::rand_datetime_daily()?,
+                    now.timestamp(),
+                    time::rand_datetime_daily()?.timestamp(),
                     instance_id
                 ],
             )?;
@@ -288,8 +291,8 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     WHERE id = ?4",
                     params![
                         InstanceState::Dead as u8,
-                        now,
-                        time::rand_datetime_weekly()?,
+                        now.timestamp(),
+                        time::rand_datetime_weekly()?.timestamp(),
                         instance_id
                     ],
                 )?;
@@ -299,7 +302,11 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     SET last_check_datetime = ?1,
                         next_check_datetime = ?2
                     WHERE id = ?3",
-                    params![now, time::rand_datetime_daily()?, instance_id],
+                    params![
+                        now.timestamp(),
+                        time::rand_datetime_daily()?.timestamp(),
+                        instance_id
+                    ],
                 )?;
             }
         }
@@ -309,7 +316,11 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 SET last_check_datetime = ?1,
                     next_check_datetime = ?2
                 WHERE id = ?3",
-                params![now, time::rand_datetime_weekly()?, instance_id],
+                params![
+                    now.timestamp(),
+                    time::rand_datetime_weekly()?.timestamp(),
+                    instance_id
+                ],
             )?;
         }
     }
@@ -349,9 +360,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 VALUES (?1, ?2, ?3, ?4)",
                 params![
                     to.to_string(),
-                    now,
+                    now.timestamp(),
                     instance_id,
-                    time::rand_datetime_today()?
+                    time::rand_datetime_today()?.timestamp()
                 ],
             )?;
             let to_instance_id: u64 = tx.query_row(
@@ -363,7 +374,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             tx.execute(
                 "INSERT INTO moving_state_data(instance, moving_since, moving_to)
                 VALUES (?1, ?2, ?3)",
-                params![instance_id, to_instance_id, now],
+                params![instance_id, to_instance_id, now.timestamp()],
             )?;
             tx.execute(
                 "UPDATE instances
@@ -373,8 +384,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 WHERE id = ?4",
                 params![
                     InstanceState::Moving as u8,
-                    now,
-                    time::rand_datetime_daily()?,
+                    now.timestamp(),
+                    time::rand_datetime_daily()?.timestamp(),
                     instance_id
                 ],
             )?;
@@ -436,8 +447,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         WHERE id = ?4",
                         params![
                             InstanceState::Moved as u8,
-                            now,
-                            time::rand_datetime_weekly()?,
+                            now.timestamp(),
+                            time::rand_datetime_weekly()?.timestamp(),
                             instance_id
                         ],
                     )?;
@@ -447,7 +458,11 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         SET last_check_datetime = ?1,
                             next_check_datetime = ?2
                         WHERE id = ?3",
-                        params![now, time::rand_datetime_daily()?, instance_id],
+                        params![
+                            now.timestamp(),
+                            time::rand_datetime_daily()?.timestamp(),
+                            instance_id
+                        ],
                     )?;
                 }
             } else {
@@ -458,14 +473,18 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         redirects_count = 1,
                         moving_to = ?2
                     WHERE instance = ?3",
-                    params![now, to_instance_id, instance_id],
+                    params![now.timestamp(), to_instance_id, instance_id],
                 )?;
                 tx.execute(
                     "UPDATE instances
                     SET last_check_datetime = ?1,
                         next_check_datetime = ?2
                     WHERE id = ?3",
-                    params![now, time::rand_datetime_daily()?, instance_id],
+                    params![
+                        now.timestamp(),
+                        time::rand_datetime_daily()?.timestamp(),
+                        instance_id
+                    ],
                 )?;
             }
         }
@@ -475,7 +494,11 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 SET last_check_datetime = ?1,
                     next_check_datetime = ?2
                 WHERE id = ?3",
-                params![now, time::rand_datetime_weekly()?, instance_id],
+                params![
+                    now.timestamp(),
+                    time::rand_datetime_weekly()?.timestamp(),
+                    instance_id
+                ],
             )?;
         }
     };
@@ -504,9 +527,9 @@ pub fn add_instance(
         VALUES (?1, ?2, ?3, ?4)",
         params![
             instance.to_string(),
-            now,
+            now.timestamp(),
             source_instance_id,
-            time::rand_datetime_today()?
+            time::rand_datetime_today()?.timestamp()
         ],
     )?;
 
@@ -534,7 +557,7 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         "UPDATE instances
         SET next_check_datetime = ?1
         WHERE hostname = ?2",
-        params![next_check_datetime, instance.to_string()],
+        params![next_check_datetime.timestamp(), instance.to_string()],
     )?;
 
     Ok(tx.commit()?)
@@ -562,7 +585,7 @@ pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
             .query_row(
                 "SELECT id, hostname
                 FROM instances
-                WHERE next_check_datetime < CURRENT_TIMESTAMP
+                WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)
                     AND check_started IS NULL
                 ORDER BY random()
                 LIMIT 1",
@@ -582,7 +605,7 @@ pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
 
         tx.execute(
             "UPDATE instances
-            SET check_started = CURRENT_TIMESTAMP
+            SET check_started = strftime('%s', CURRENT_TIMESTAMP)
             WHERE id = ?1",
             params![id],
         )?;
@@ -608,7 +631,7 @@ pub fn outstanding_checks_count(conn: &Connection) -> anyhow::Result<u64> {
     Ok(conn.query_row(
         "SELECT count(id)
         FROM instances
-        WHERE next_check_datetime < CURRENT_TIMESTAMP
+        WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)
             AND check_started IS NULL",
         [],
         |row| row.get(0),
