@@ -40,7 +40,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             state TEXT UNIQUE NOT NULL
         )",
         [],
-    ).context("Creating table states")?;
+    )
+    .context("Creating table states")?;
     // These states are mapped to `InstanceState`.
     conn.execute(
         r#"INSERT OR IGNORE INTO states (id, state)
@@ -52,7 +53,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             (4, "moving"),
             (5, "moved")"#,
         [],
-    ).context("Filling table states")?;
+    )
+    .context("Filling table states")?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS instances(
             id INTEGER PRIMARY KEY NOT NULL,
@@ -65,18 +67,21 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             check_started INTEGER DEFAULT NULL
         )",
         [],
-    ).context("Creating table instances")?;
+    )
+    .context("Creating table instances")?;
     conn.execute(
         r#"INSERT OR IGNORE
         INTO instances(hostname, discovered_datetime)
         VALUES ("mastodon.social", CURRENT_TIMESTAMP)"#,
         [],
-    ).context("Adding mastodon.social to the instances table")?;
+    )
+    .context("Adding mastodon.social to the instances table")?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS instances_next_check_datetime_idx
         ON instances(next_check_datetime)",
         [],
-    ).context("Creating index on instances(next_check_datetime)")?;
+    )
+    .context("Creating index on instances(next_check_datetime)")?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS alive_state_data(
@@ -84,7 +89,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             instance REFERENCES instances(id) NOT NULL UNIQUE
         )",
         [],
-    ).context("Creating table alive_state_data")?;
+    )
+    .context("Creating table alive_state_data")?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS dying_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
@@ -93,7 +99,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             failed_checks_count INTEGER NOT NULL DEFAULT 1
         )",
         [],
-    ).context("Creating table dying_state_data")?;
+    )
+    .context("Creating table dying_state_data")?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS moving_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
@@ -103,7 +110,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             moving_to REFERENCES instances(id) NOT NULL
         )",
         [],
-    ).context("Creating table moving_state_data")?;
+    )
+    .context("Creating table moving_state_data")?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS moved_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
@@ -111,7 +119,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
             moved_to REFERENCES instances(id) NOT NULL
         )",
         [],
-    ).context("Creating table moved_state_data")?;
+    )
+    .context("Creating table moved_state_data")?;
 
     Ok(())
 }
