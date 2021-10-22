@@ -9,9 +9,9 @@ mod instance_checker;
 static CHECKERS_COUNT: AtomicU64 = AtomicU64::new(0);
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
-    let conn = db::open()?;
-    db::init(&conn)?;
-    db::reschedule_missed_checks(&conn)?;
+    let mut conn = db::open()?;
+    db::init(&mut conn)?;
+    db::reschedule_missed_checks(&mut conn)?;
     db::disengage_previous_checks(&conn)?;
 
     loop {

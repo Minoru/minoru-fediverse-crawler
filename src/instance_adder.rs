@@ -4,8 +4,8 @@ use std::io::{self, BufRead};
 use url::Host;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
-    let conn = db::open()?;
-    db::init(&conn)?;
+    let mut conn = db::open()?;
+    db::init(&mut conn)?;
 
     let stdin = io::stdin();
     let stdin = stdin.lock();

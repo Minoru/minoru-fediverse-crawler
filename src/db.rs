@@ -33,8 +33,10 @@ pub fn open() -> anyhow::Result<Connection> {
     Connection::open("fediverse.observer.db").context("Failed to initialize the database")
 }
 
-pub fn init(conn: &Connection) -> anyhow::Result<()> {
-    conn.execute(
+pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS states(
             id INTEGER PRIMARY KEY NOT NULL,
             state TEXT UNIQUE NOT NULL
@@ -43,7 +45,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
     )
     .context("Creating table states")?;
     // These states are mapped to `InstanceState`.
-    conn.execute(
+    tx.execute(
         r#"INSERT OR IGNORE INTO states (id, state)
         VALUES
             (0, "discovered"),
@@ -55,7 +57,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )
     .context("Filling table states")?;
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS instances(
             id INTEGER PRIMARY KEY NOT NULL,
             hostname TEXT UNIQUE NOT NULL,
@@ -67,21 +69,21 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )
     .context("Creating table instances")?;
-    conn.execute(
+    tx.execute(
         r#"INSERT OR IGNORE
         INTO instances(hostname)
         VALUES ("mastodon.social")"#,
         [],
     )
     .context("Adding mastodon.social to the instances table")?;
-    conn.execute(
+    tx.execute(
         "CREATE INDEX IF NOT EXISTS instances_next_check_datetime_idx
         ON instances(next_check_datetime)",
         [],
     )
     .context("Creating index on instances(next_check_datetime)")?;
 
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS alive_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE
@@ -89,7 +91,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )
     .context("Creating table alive_state_data")?;
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS dying_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
@@ -99,7 +101,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )
     .context("Creating table dying_state_data")?;
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS moving_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
@@ -110,7 +112,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         [],
     )
     .context("Creating table moving_state_data")?;
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS moved_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
@@ -120,7 +122,7 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
     )
     .context("Creating table moved_state_data")?;
 
-    Ok(())
+    Ok(tx.commit()?)
 }
 
 /// If the server was stopped mid-way, some entries in the database can still be marked as "being
@@ -135,21 +137,26 @@ pub fn disengage_previous_checks(conn: &Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn reschedule_missed_checks(conn: &Connection) -> anyhow::Result<()> {
-    let mut statement = conn.prepare(
-        "SELECT id
+pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
+    let tx = conn.transaction()?;
+
+    {
+        let mut statement = tx.prepare(
+            "SELECT id
             FROM instances
             WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)",
-    )?;
-    let mut ids = statement.query([])?;
-    while let Some(row) = ids.next()? {
-        let instance_id: u64 = row.get(0)?;
-        conn.execute(
-            "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
-            params![time::rand_datetime_today()?.timestamp(), instance_id],
         )?;
+        let mut ids = statement.query([])?;
+        while let Some(row) = ids.next()? {
+            let instance_id: u64 = row.get(0)?;
+            tx.execute(
+                "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
+                params![time::rand_datetime_today()?.timestamp(), instance_id],
+            )?;
+        }
     }
-    Ok(())
+
+    Ok(tx.commit()?)
 }
 
 pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
