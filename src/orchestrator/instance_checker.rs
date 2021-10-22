@@ -180,7 +180,7 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::add_instance(conn, target, &peer)?;
+                db::add_instance(conn, &peer)?;
                 peers_count += 1;
             }
         }

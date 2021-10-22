@@ -59,8 +59,6 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
         "CREATE TABLE IF NOT EXISTS instances(
             id INTEGER PRIMARY KEY NOT NULL,
             hostname TEXT UNIQUE NOT NULL,
-            discovered_datetime INTEGER NOT NULL,
-            discovered_via REFERENCES instances(id) DEFAULT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
             last_check_datetime INTEGER DEFAULT NULL,
             next_check_datetime INTEGER DEFAULT (strftime('%s', CURRENT_TIMESTAMP)),
@@ -71,8 +69,8 @@ pub fn init(conn: &Connection) -> anyhow::Result<()> {
     .context("Creating table instances")?;
     conn.execute(
         r#"INSERT OR IGNORE
-        INTO instances(hostname, discovered_datetime)
-        VALUES ("mastodon.social", strftime('%s', CURRENT_TIMESTAMP))"#,
+        INTO instances(hostname)
+        VALUES ("mastodon.social")"#,
         [],
     )
     .context("Adding mastodon.social to the instances table")?;
@@ -356,14 +354,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
 
             tx.execute(
                 "INSERT OR IGNORE
-                INTO instances(hostname, discovered_datetime, discovered_via, next_check_datetime)
-                VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    to.to_string(),
-                    now.timestamp(),
-                    instance_id,
-                    time::rand_datetime_today()?.timestamp()
-                ],
+                INTO instances(hostname, next_check_datetime)
+                VALUES (?1, ?2)",
+                params![to.to_string(), time::rand_datetime_today()?.timestamp()],
             )?;
             let to_instance_id: u64 = tx.query_row(
                 "SELECT id FROM instances WHERE hostname = ?1",
@@ -506,46 +499,28 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
     Ok(tx.commit()?)
 }
 
-pub fn add_instance(
-    conn: &mut Connection,
-    source_instance: &Host,
-    instance: &Host,
-) -> anyhow::Result<()> {
-    let tx = conn.transaction()?;
-
-    let now = Utc::now();
-    let source_instance_id: u64 = tx.query_row(
-        "SELECT id
-        FROM instances
-        WHERE hostname = ?1",
-        params![source_instance.to_string()],
-        |row| row.get(0),
-    )?;
-    tx.execute(
+pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+    conn.execute(
         "INSERT OR IGNORE
-        INTO instances(hostname, discovered_datetime, discovered_via, next_check_datetime)
-        VALUES (?1, ?2, ?3, ?4)",
+        INTO instances(hostname, next_check_datetime)
+        VALUES (?1, ?2)",
         params![
             instance.to_string(),
-            now.timestamp(),
-            source_instance_id,
             time::rand_datetime_today()?.timestamp()
         ],
     )?;
 
-    Ok(tx.commit()?)
+    Ok(())
 }
 
 /// Add an instance which we got from elsewhere (not someone's peers list).
 pub fn add_unreferenced_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    let now = Utc::now();
     conn.execute(
         "INSERT OR IGNORE
-        INTO instances(hostname, discovered_datetime,  next_check_datetime)
-        VALUES (?1, ?2, ?3)",
+        INTO instances(hostname, next_check_datetime)
+        VALUES (?1, ?2)",
         params![
             instance.to_string(),
-            now.timestamp(),
             time::rand_datetime_today()?.timestamp()
         ],
     )?;
