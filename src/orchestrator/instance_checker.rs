@@ -1,7 +1,7 @@
 use crate::ipc;
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{error, o, Logger};
+use slog::{error, info, o, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -9,12 +9,21 @@ use url::Host;
 
 use crate::orchestrator::db;
 
-fn try_pick_next_instance(conn: &mut Connection) -> Option<Host> {
+fn try_pick_next_instance(logger: &Logger, conn: &mut Connection) -> Option<Host> {
     const MAX_TRIES: u8 = 5;
     const MIN_SLEEP_MS: u64 = 10;
     const MAX_SLEEP_MS: u64 = 5000;
     for _ in 1..=MAX_TRIES {
-        if let Some(instance) = db::pick_next_instance(conn) {
+        let next = {
+            let started = chrono::offset::Utc::now();
+            let result = db::pick_next_instance(conn);
+            let finished = chrono::offset::Utc::now();
+            if result.is_some() {
+                info!(logger, "Picked next instance in {}", finished - started);
+            }
+            result
+        };
+        if let Some(instance) = next {
             return Some(instance);
         }
         let sleep_ms = fastrand::u64(MIN_SLEEP_MS..MAX_SLEEP_MS);
@@ -27,7 +36,7 @@ fn try_pick_next_instance(conn: &mut Connection) -> Option<Host> {
 pub fn run(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     loop {
-        if let Some(instance) = try_pick_next_instance(&mut conn) {
+        if let Some(instance) = try_pick_next_instance(&logger, &mut conn) {
             println!("Checking {}", instance);
 
             let logger = logger.new(o!("host" => instance.to_string()));
