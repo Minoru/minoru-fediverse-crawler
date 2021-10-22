@@ -1,4 +1,4 @@
-use crate::orchestrator::time;
+use crate::time;
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
@@ -534,6 +534,22 @@ pub fn add_instance(
     )?;
 
     Ok(tx.commit()?)
+}
+
+/// Add an instance which we got from elsewhere (not someone's peers list).
+pub fn add_unreferenced_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+    let now = Utc::now();
+    conn.execute(
+        "INSERT OR IGNORE
+        INTO instances(hostname, discovered_datetime,  next_check_datetime)
+        VALUES (?1, ?2, ?3)",
+        params![
+            instance.to_string(),
+            now.timestamp(),
+            time::rand_datetime_today()?.timestamp()
+        ],
+    )?;
+    Ok(())
 }
 
 /// Reschedule the instance according to its state.

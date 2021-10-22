@@ -1,11 +1,10 @@
+use crate::db;
 use slog::{error, info, Logger};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 
-mod db;
 mod instance_checker;
-mod time;
 
 static CHECKERS_COUNT: AtomicU64 = AtomicU64::new(0);
 
