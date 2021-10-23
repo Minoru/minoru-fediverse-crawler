@@ -10,14 +10,16 @@ use url::Host;
 use crate::orchestrator::db;
 
 fn try_pick_next_instance(conn: &mut Connection) -> Option<Host> {
-    const MAX_TRIES: u8 = 5;
+    const MAX_WAIT_MS: u64 = 60_000;
     const MIN_SLEEP_MS: u64 = 10;
-    const MAX_SLEEP_MS: u64 = 5000;
-    for _ in 1..=MAX_TRIES {
+    const MAX_SLEEP_MS: u64 = 5_000;
+    let mut waiting_for_ms = 0;
+    while waiting_for_ms < MAX_WAIT_MS {
         if let Some(instance) = db::pick_next_instance(conn) {
             return Some(instance);
         }
         let sleep_ms = fastrand::u64(MIN_SLEEP_MS..MAX_SLEEP_MS);
+        waiting_for_ms += sleep_ms;
         std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
     }
 
