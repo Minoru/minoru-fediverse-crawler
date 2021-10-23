@@ -60,9 +60,7 @@ struct CheckerHandle {
 
 impl CheckerHandle {
     fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
-        let exe_path = env::args_os()
-            .next()
-            .ok_or_else(|| anyhow!("Failed to determine the path to the executable"))?;
+        let exe_path = env::current_exe()?;
 
         let inner = Command::new(exe_path)
             .arg("--check")
