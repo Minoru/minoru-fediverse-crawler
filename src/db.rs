@@ -30,7 +30,10 @@ impl InstanceState {
 }
 
 pub fn open() -> anyhow::Result<Connection> {
-    Connection::open("fediverse.observer.db").context("Failed to initialize the database")
+    let conn =
+        Connection::open("fediverse.observer.db").context("Failed to initialize the database")?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    Ok(conn)
 }
 
 pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
