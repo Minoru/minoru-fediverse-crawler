@@ -523,20 +523,6 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Add an instance which we got from elsewhere (not someone's peers list).
-pub fn add_unreferenced_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    conn.execute(
-        "INSERT OR IGNORE
-        INTO instances(hostname, next_check_datetime)
-        VALUES (?1, ?2)",
-        params![
-            instance.to_string(),
-            time::rand_datetime_today()?.timestamp()
-        ],
-    )?;
-    Ok(())
-}
-
 /// Reschedule the instance according to its state.
 ///
 /// This is meant to be used when the checker fails. In that case, we want to reschedule the
