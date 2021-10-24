@@ -2,7 +2,6 @@ use crate::time;
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
-use slog::{info, Logger};
 use url::Host;
 
 /// Instance states which are stored in the DB.
@@ -510,8 +509,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
     Ok(tx.commit()?)
 }
 
-pub fn add_instance(logger: &Logger, conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    let started = chrono::offset::Utc::now();
+pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     let mut statement = conn.prepare_cached(
         "INSERT OR IGNORE
         INTO instances(hostname, next_check_datetime)
@@ -521,8 +519,6 @@ pub fn add_instance(logger: &Logger, conn: &Connection, instance: &Host) -> anyh
         instance.to_string(),
         time::rand_datetime_today()?.timestamp()
     ])?;
-    let finished = chrono::offset::Utc::now();
-    info!(logger, "add_instance() took {}", finished - started);
 
     Ok(())
 }

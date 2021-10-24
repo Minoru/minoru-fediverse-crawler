@@ -154,7 +154,7 @@ fn process_checker_response(
 }
 
 fn process_peers(
-    logger: &Logger,
+    _logger: &Logger,
     conn: &mut Connection,
     target: &Host,
     lines: impl Iterator<Item = std::io::Result<String>>,
@@ -171,7 +171,7 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::add_instance(logger, conn, &peer)?;
+                db::add_instance(conn, &peer)?;
                 peers_count += 1;
             }
         }

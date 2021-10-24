@@ -14,7 +14,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     for instance in reader.lines() {
         let instance = instance?;
         info!(logger, "Manually adding {} to the database", instance);
-        db::add_instance(&logger, &conn, &Host::Domain(instance))?;
+        db::add_instance(&conn, &Host::Domain(instance))?;
     }
 
     Ok(())
