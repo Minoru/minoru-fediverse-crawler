@@ -512,15 +512,15 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
 
 pub fn add_instance(logger: &Logger, conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     let started = chrono::offset::Utc::now();
-    conn.execute(
+    let mut statement = conn.prepare_cached(
         "INSERT OR IGNORE
         INTO instances(hostname, next_check_datetime)
         VALUES (?1, ?2)",
-        params![
-            instance.to_string(),
-            time::rand_datetime_today()?.timestamp()
-        ],
     )?;
+    statement.execute(params![
+        instance.to_string(),
+        time::rand_datetime_today()?.timestamp()
+    ])?;
     let finished = chrono::offset::Utc::now();
     info!(logger, "add_instance() took {}", finished - started);
 
