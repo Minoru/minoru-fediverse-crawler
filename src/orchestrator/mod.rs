@@ -28,7 +28,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(30));
             continue;
         }
-        if !wait.is_zero() {
+        if wait > chrono::Duration::zero() {
             std::thread::sleep(wait.to_std()?);
         }
         db::reschedule(&mut conn, &instance).context("Orchestrator rescheduling an instance")?;
