@@ -9,45 +9,18 @@ use url::Host;
 
 use crate::orchestrator::db;
 
-fn try_pick_next_instance(conn: &mut Connection) -> Option<Host> {
-    const MAX_WAIT_MS: u64 = 60_000;
-    const MIN_SLEEP_MS: u64 = 10;
-    const MAX_SLEEP_MS: u64 = 5_000;
-    let mut waiting_for_ms = 0;
-    while waiting_for_ms < MAX_WAIT_MS {
-        if let Some(instance) = db::pick_next_instance(conn) {
-            return Some(instance);
-        }
-        let sleep_ms = fastrand::u64(MIN_SLEEP_MS..MAX_SLEEP_MS);
-        waiting_for_ms += sleep_ms;
-        std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
-    }
+const RECEIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-    None
-}
-
-pub fn run(logger: Logger) -> anyhow::Result<()> {
+pub fn run(logger: Logger, rx: crossbeam_channel::Receiver<Host>) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     loop {
-        if let Some(instance) = try_pick_next_instance(&mut conn) {
-            println!("Checking {}", instance);
+        let instance = rx.recv_timeout(RECEIVE_TIMEOUT)?;
 
-            let logger = logger.new(o!("host" => instance.to_string()));
+        println!("Checking {}", instance);
 
-            let result = check(logger.clone(), &mut conn, &instance);
-            if let Err(e) = db::finish_checking(&conn, &instance) {
-                error!(
-                    logger,
-                    "Error marking {} as checked in the DB: {}",
-                    instance.to_string(),
-                    e
-                );
-            }
-            if result.is_err() {
-                return result;
-            }
-        } else {
-            return Ok(());
+        let logger = logger.new(o!("host" => instance.to_string()));
+        if let Err(e) = check(logger.clone(), &mut conn, &instance) {
+            error!(logger, "{}", e);
         }
     }
 }
@@ -100,10 +73,7 @@ impl Drop for CheckerHandle {
 
 fn check(logger: Logger, conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     let mut checker = CheckerHandle::new(logger.clone(), instance.clone())?;
-    if let Err(e) = process_checker_response(&logger, conn, instance, &mut checker.inner) {
-        db::reschedule(conn, instance)
-            .with_context(|| format!("While handling a checker error: {}", e))?;
-    }
+    process_checker_response(&logger, conn, instance, &mut checker.inner)?;
     Ok(())
 }
 
@@ -141,7 +111,6 @@ fn process_checker_response(
             }
             ipc::InstanceState::Moving { to } => {
                 println!("{} is moving to {}", target, to);
-                db::reschedule(conn, target)?;
             }
             ipc::InstanceState::Moved { to } => {
                 println!("{} has moved to {}", target, to);

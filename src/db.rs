@@ -4,7 +4,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use rusqlite::{
     params,
     types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef},
-    Connection, OptionalExtension, ToSql, Transaction,
+    Connection, ToSql, Transaction,
 };
 use url::Host;
 
@@ -90,8 +90,7 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
             hostname TEXT UNIQUE NOT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
             last_check_datetime INTEGER DEFAULT NULL,
-            next_check_datetime INTEGER DEFAULT (strftime('%s', CURRENT_TIMESTAMP)),
-            check_started INTEGER DEFAULT NULL
+            next_check_datetime INTEGER DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
         )",
         [],
     )
@@ -150,18 +149,6 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     .context("Creating table moved_state_data")?;
 
     Ok(tx.commit()?)
-}
-
-/// If the server was stopped mid-way, some entries in the database can still be marked as "being
-/// checked". Remove those marks.
-pub fn disengage_previous_checks(conn: &Connection) -> anyhow::Result<()> {
-    conn.execute(
-        "UPDATE instances
-        SET check_started = NULL
-        WHERE check_started IS NOT NULL",
-        [],
-    )?;
-    Ok(())
 }
 
 pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
@@ -295,7 +282,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 WHERE instance = ?1",
                 params![instance_id],
             )?;
-            let (checks_count, since): (u64, chrono::DateTime<Utc>) = tx.query_row(
+            let (checks_count, since): (u64, DateTime<Utc>) = tx.query_row(
                 "SELECT failed_checks_count, dying_since
                 FROM dying_state_data
                 WHERE instance = ?1",
@@ -441,7 +428,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 )?;
 
                 // If the instance is in "moving" state for over a week, consider it moved
-                let (redirects_count, since): (u64, chrono::DateTime<Utc>) = tx.query_row(
+                let (redirects_count, since): (u64, DateTime<Utc>) = tx.query_row(
                     "SELECT redirects_count, moving_since
                     FROM moving_state_data
                     WHERE instance = ?1",
@@ -584,67 +571,21 @@ fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<Insta
         .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
 }
 
-/// Picks the next instance to check, marks it as "being checked" in the database, and returns its
-/// hostname.
-///
-/// The user has to call `finish_checking()` to un-mark the instance when the check is done.
-pub fn pick_next_instance(conn: &mut Connection) -> Option<Host> {
-    let mut get_hostname = || -> rusqlite::Result<Option<Host>> {
-        let tx = conn.transaction()?;
-
-        let result: Option<(u64, String)> = tx
-            .query_row(
-                "SELECT id, hostname
-                FROM instances
-                WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)
-                    AND check_started IS NULL
-                ORDER BY random()
-                LIMIT 1",
-                [],
-                |row| {
-                    let id = row.get(0)?;
-                    let hostname = row.get(1)?;
-                    Ok((id, hostname))
-                },
-            )
-            .optional()?;
-
-        let (id, hostname) = match result {
-            Some(r) => r,
-            None => return Ok(None),
-        };
-
-        tx.execute(
-            "UPDATE instances
-            SET check_started = strftime('%s', CURRENT_TIMESTAMP)
-            WHERE id = ?1",
-            params![id],
-        )?;
-
-        tx.commit()?;
-        Ok(Some(Host::Domain(hostname)))
-    };
-
-    get_hostname().ok().flatten()
-}
-
-pub fn finish_checking(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
-    conn.execute(
-        "UPDATE instances
-        SET check_started = NULL
-        WHERE hostname = ?1",
-        params![instance.to_string()],
-    )?;
-    Ok(())
-}
-
-pub fn outstanding_checks_count(conn: &Connection) -> anyhow::Result<u64> {
-    Ok(conn.query_row(
-        "SELECT count(id)
-        FROM instances
-        WHERE next_check_datetime < strftime('%s', CURRENT_TIMESTAMP)
-            AND check_started IS NULL",
-        [],
-        |row| row.get(0),
-    )?)
+/// Picks the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
+pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Host, DateTime<Utc>)> {
+    let (hostname, next_check_datetime): (String, DateTime<Utc>) = conn
+        .query_row(
+            "SELECT hostname, next_check_datetime
+            FROM instances
+            ORDER BY next_check_datetime ASC
+            LIMIT 1",
+            [],
+            |row| {
+                let hostname = row.get(0)?;
+                let next_check_datetime: UnixTimestamp = row.get(1)?;
+                Ok((hostname, next_check_datetime.0))
+            },
+        )
+        .context("Picking next instance")?;
+    Ok((Host::Domain(hostname), next_check_datetime))
 }
