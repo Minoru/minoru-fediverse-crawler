@@ -110,14 +110,6 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     .context("Creating index on instances(next_check_datetime)")?;
 
     tx.execute(
-        "CREATE TABLE IF NOT EXISTS alive_state_data(
-            id INTEGER PRIMARY KEY NOT NULL,
-            instance REFERENCES instances(id) NOT NULL UNIQUE
-        )",
-        [],
-    )
-    .context("Creating table alive_state_data")?;
-    tx.execute(
         "CREATE TABLE IF NOT EXISTS dying_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
@@ -199,14 +191,6 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         params![instance_id],
     )?;
 
-    // Create/update alive state data
-    tx.execute(
-        "INSERT OR REPLACE
-        INTO alive_state_data(instance)
-        VALUES (?1)",
-        params![instance_id],
-    )?;
-
     // Mark the instance alive and schedule the next check
     tx.execute(
         "UPDATE instances
@@ -239,11 +223,6 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
         | InstanceState::Alive
         | InstanceState::Moving
         | InstanceState::Moved => {
-            tx.execute(
-                "DELETE FROM alive_state_data
-                WHERE instance = ?1",
-                params![instance_id],
-            )?;
             tx.execute(
                 "DELETE FROM moving_state_data
                 WHERE instance = ?1",
@@ -362,11 +341,6 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         | InstanceState::Alive
         | InstanceState::Dying
         | InstanceState::Dead => {
-            tx.execute(
-                "DELETE FROM alive_state_data
-                WHERE instance = ?1",
-                params![instance_id],
-            )?;
             tx.execute(
                 "DELETE FROM dying_state_data
                 WHERE instance = ?1",
