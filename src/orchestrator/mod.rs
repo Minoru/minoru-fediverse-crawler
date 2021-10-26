@@ -5,9 +5,11 @@ use url::Host;
 
 mod instance_checker;
 
-const QUEUE_SIZE: usize = 5;
-const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(250);
-// This has to be a large-ish number, so Orchestrator can out-starve any other thread
+/// How many checks can pile up before an additional worker is spawned.
+const QUEUE_SIZE: usize = 10;
+/// How long can we wait on a full queue before spawning an additional worker.
+const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
+/// This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_secs(3);
