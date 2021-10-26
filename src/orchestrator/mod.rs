@@ -12,7 +12,7 @@ const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 /// This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_secs(3);
+const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_millis(10);
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
