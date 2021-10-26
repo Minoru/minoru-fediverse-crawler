@@ -12,7 +12,7 @@ use crate::orchestrator::db;
 /// How long a checker would wait for new work before quitting.
 ///
 /// Timeout of one second means we keep around as many workers as there are checks per second.
-const RECEIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+const RECEIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub fn run(logger: Logger, rx: crossbeam_channel::Receiver<Host>) -> anyhow::Result<()> {
     let mut conn = db::open()?;
