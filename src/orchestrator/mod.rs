@@ -10,8 +10,7 @@ const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(250);
 // This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-const MAX_ERRORS: u8 = 3;
-const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_secs(30);
+const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_secs(3);
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
@@ -43,22 +42,30 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         Ok(())
     };
 
-    let mut errors_count = 0;
-    let mut last_error: Option<anyhow::Error> = None;
-    while errors_count < MAX_ERRORS {
-        match iteration() {
-            Ok(()) => {
-                errors_count = 0;
+    let is_sqlite_busy_error = |error: &anyhow::Error| -> bool {
+        if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
+            use libsqlite3_sys::{Error, ErrorCode};
+            use rusqlite::Error::SqliteFailure;
+
+            if let SqliteFailure(Error { code, .. }, _) = error {
+                return *code == ErrorCode::DatabaseBusy;
             }
-            Err(e) => {
-                errors_count += 1;
-                last_error = Some(e);
+        }
+
+        false
+    };
+
+    loop {
+        if let Err(e) = iteration() {
+            if is_sqlite_busy_error(&e) {
+                // If some transaction couldn't be run because of a locked database, just wait
+                // a bit and try again.
                 std::thread::sleep(SLEEP_BETWEEN_ERRORS);
+            } else {
+                return Err(e);
             }
         }
     }
-
-    Err(last_error.expect("Got out of main loop without filling `last_error`"))
 }
 
 fn spawn_worker(logger: &Logger, rx: &crossbeam_channel::Receiver<Host>) {
