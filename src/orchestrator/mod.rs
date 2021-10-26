@@ -7,8 +7,6 @@ mod instance_checker;
 
 /// How many checks can pile up before an additional worker is spawned.
 const QUEUE_SIZE: usize = 10;
-/// How long can we wait on a full queue before spawning an additional worker.
-const SEND_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(50);
 /// This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
@@ -36,7 +34,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
             std::thread::sleep(wait.to_std()?);
         }
         db::reschedule(&mut conn, &instance).context("Orchestrator rescheduling an instance")?;
-        if tx.send_timeout(instance.clone(), SEND_TIMEOUT).is_err() {
+        if tx.try_send(instance.clone()).is_err() {
             spawn_worker(&logger, &rx);
             tx.send(instance)?;
         }
