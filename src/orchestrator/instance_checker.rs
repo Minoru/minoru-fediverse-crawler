@@ -57,20 +57,37 @@ impl CheckerHandle {
 
 impl Drop for CheckerHandle {
     fn drop(&mut self) {
-        if self.inner.try_wait().is_err() {
-            if let Err(e) = self.inner.kill() {
-                error!(
-                    self.logger,
-                    "Failed to kill the checker for {}: {}", self.instance, e
-                );
+        match self.inner.try_wait() {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                if let Err(e) = self.inner.wait() {
+                    error!(
+                        self.logger,
+                        "Failed to wait for the checker for {} to exit: {}", self.instance, e
+                    );
+                }
             }
-            if let Err(e) = self.inner.wait() {
+            Err(e) => {
                 error!(
                     self.logger,
-                    "Failed to wait for the checker for {} to exit after kill: {}",
-                    self.instance,
-                    e
+                    "try_wait() for checker for {} failed: {}", self.instance, e
                 );
+
+                if let Err(e) = self.inner.kill() {
+                    error!(
+                        self.logger,
+                        "Failed to kill the checker for {}: {}", self.instance, e
+                    );
+                }
+
+                if let Err(e) = self.inner.wait() {
+                    error!(
+                        self.logger,
+                        "Failed to wait for the checker for {} to exit after kill: {}",
+                        self.instance,
+                        e
+                    );
+                }
             }
         }
     }
