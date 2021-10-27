@@ -64,10 +64,12 @@ impl Drop for CheckerHandle {
                     "Failed to kill the checker for {}: {}", self.instance, e
                 );
             }
-            if let Err(e) = self.inner.try_wait() {
+            if let Err(e) = self.inner.wait() {
                 error!(
                     self.logger,
-                    "The checker for {} survived the kill() somehow: {}", self.instance, e
+                    "Failed to wait for the checker for {} to exit after kill: {}",
+                    self.instance,
+                    e
                 );
             }
         }
