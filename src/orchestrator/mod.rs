@@ -75,7 +75,7 @@ fn spawn_worker(logger: &Logger, rx: &crossbeam_channel::Receiver<Host>) {
     let rx = rx.clone();
     std::thread::spawn(move || {
         if let Err(e) = instance_checker::run(logger.clone(), rx) {
-            error!(logger, "Checker error: {}", e);
+            error!(logger, "Checker error: {:?}", e);
         }
 
         println!("{} A worker finished", "<".repeat(35));

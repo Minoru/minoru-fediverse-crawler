@@ -23,7 +23,7 @@ pub fn run(logger: Logger, rx: crossbeam_channel::Receiver<Host>) -> anyhow::Res
 
         let logger = logger.new(o!("host" => instance.to_string()));
         if let Err(e) = check(logger.clone(), &mut conn, &instance) {
-            error!(logger, "{}", e);
+            error!(logger, "{:?}", e);
         }
     }
 }
