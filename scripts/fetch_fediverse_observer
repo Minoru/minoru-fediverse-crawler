@@ -3,6 +3,7 @@
 set -e
 
 curl \
+    --silent \
     --request POST \
     --header 'Content-Type: application/json' \
     --data '{"query": "{ nodes { domain status } }"}' \

@@ -3,6 +3,7 @@
 set -e
 
 curl \
+    --silent \
     --header 'Accept: application/json' \
     'https://instances.joinpeertube.org/api/v1/instances/hosts?count=100000' \
 | \
