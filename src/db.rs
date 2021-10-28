@@ -13,8 +13,6 @@ pub fn on_sqlite_busy_retry_indefinitely<T, F>(f: &mut F) -> anyhow::Result<T>
 where
     F: FnMut() -> anyhow::Result<T>,
 {
-    const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_millis(10);
-
     let is_sqlite_busy_error = |error: &anyhow::Error| -> bool {
         if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
             use libsqlite3_sys::{Error, ErrorCode};
@@ -33,7 +31,8 @@ where
             result @ Ok(_) => return result,
             Err(e) => {
                 if is_sqlite_busy_error(&e) {
-                    std::thread::sleep(SLEEP_BETWEEN_ERRORS);
+                    let duration = fastrand::u64(1..50);
+                    std::thread::sleep(std::time::Duration::from_millis(duration));
                 } else {
                     return Err(e);
                 }
