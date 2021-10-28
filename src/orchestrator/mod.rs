@@ -1,4 +1,4 @@
-use crate::db;
+use crate::{db, with_loc};
 use anyhow::Context;
 use slog::{error, Logger};
 use url::Host;
@@ -23,8 +23,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     spawn_worker(&logger, &rx);
 
     let mut iteration = || -> anyhow::Result<()> {
-        let (instance, check_time) =
-            db::pick_next_instance(&conn).context("Orchestrator picking next instance")?;
+        let (instance, check_time) = db::pick_next_instance(&conn)
+            .context(with_loc!("Orchestrator picking next instance"))?;
         let wait = check_time - chrono::offset::Utc::now();
         if wait > chrono::Duration::seconds(30) {
             std::thread::sleep(std::time::Duration::from_secs(30));
@@ -33,7 +33,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         if wait > chrono::Duration::zero() {
             std::thread::sleep(wait.to_std()?);
         }
-        db::reschedule(&mut conn, &instance).context("Orchestrator rescheduling an instance")?;
+        db::reschedule(&mut conn, &instance)
+            .context(with_loc!("Orchestrator rescheduling an instance"))?;
         if tx.try_send(instance.clone()).is_err() {
             spawn_worker(&logger, &rx);
             tx.send(instance)?;

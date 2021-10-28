@@ -1,4 +1,4 @@
-use crate::ipc;
+use crate::{ipc, with_loc};
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
 use slog::{error, o, Logger};
@@ -45,7 +45,7 @@ impl CheckerHandle {
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
-            .context("Failed to spawn a checker")?;
+            .context(with_loc!("Failed to spawn a checker"))?;
 
         Ok(Self {
             inner,
@@ -114,8 +114,9 @@ fn process_checker_response(
 
     let state = {
         if let Some(line) = lines.next() {
-            let line = line.context("Failed to read a line of checker's response")?;
-            serde_json::from_str(&line).context("Failed to deserialize checker's response")?
+            let line = line.context(with_loc!("Failed to read a line of checker's response"))?;
+            serde_json::from_str(&line)
+                .context(with_loc!("Failed to deserialize checker's response"))?
         } else {
             return db::mark_dead(conn, target);
         }
@@ -152,10 +153,11 @@ fn process_peers(
 ) -> anyhow::Result<()> {
     let mut peers_count = 0;
     for response in lines {
-        let response = response.context("Failed to read a line of checker's response")?;
+        let response =
+            response.context(with_loc!("Failed to read a line of checker's response"))?;
 
-        let response: ipc::CheckerResponse =
-            serde_json::from_str(&response).context("Failed to deserialize checker's response")?;
+        let response: ipc::CheckerResponse = serde_json::from_str(&response)
+            .context(with_loc!("Failed to deserialize checker's response"))?;
 
         match response {
             ipc::CheckerResponse::State { state: _ } => {

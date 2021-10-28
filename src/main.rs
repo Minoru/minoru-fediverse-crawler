@@ -6,6 +6,7 @@ mod checker;
 mod db;
 mod instance_adder;
 mod ipc;
+mod logging_helpers;
 mod orchestrator;
 mod time;
 
