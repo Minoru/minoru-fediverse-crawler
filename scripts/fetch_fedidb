@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+curl \
+    --silent \
+    --header 'Accept: application/json' \
+    'https://fedidb.org/api/v0/network/instances' \
+| \
+jq '' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
