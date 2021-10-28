@@ -8,24 +8,24 @@ use rusqlite::{
 };
 use url::Host;
 
+fn is_sqlite_busy_error(error: &anyhow::Error) -> bool {
+    if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
+        use libsqlite3_sys::{Error, ErrorCode};
+        use rusqlite::Error::SqliteFailure;
+
+        if let SqliteFailure(Error { code, .. }, _) = error {
+            return *code == ErrorCode::DatabaseBusy;
+        }
+    }
+
+    false
+}
+
 /// A helper that, upon encountering `SQLITE_BUSY`, just waits a bit and retries.
 pub fn on_sqlite_busy_retry_indefinitely<T, F>(f: &mut F) -> anyhow::Result<T>
 where
     F: FnMut() -> anyhow::Result<T>,
 {
-    let is_sqlite_busy_error = |error: &anyhow::Error| -> bool {
-        if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
-            use libsqlite3_sys::{Error, ErrorCode};
-            use rusqlite::Error::SqliteFailure;
-
-            if let SqliteFailure(Error { code, .. }, _) = error {
-                return *code == ErrorCode::DatabaseBusy;
-            }
-        }
-
-        false
-    };
-
     loop {
         match f() {
             result @ Ok(_) => return result,
@@ -39,6 +39,28 @@ where
             }
         }
     }
+}
+
+/// A helper that, upon encountering `SQLITE_BUSY`, just waits a bit and retries, up to 100 times.
+pub fn on_sqlite_busy_retry<T, F>(f: &mut F) -> anyhow::Result<T>
+where
+    F: FnMut() -> anyhow::Result<T>,
+{
+    for _ in 0..100 {
+        match f() {
+            result @ Ok(_) => return result,
+            Err(e) => {
+                if is_sqlite_busy_error(&e) {
+                    let duration = fastrand::u64(1..50);
+                    std::thread::sleep(std::time::Duration::from_millis(duration));
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    f()
 }
 
 /// Wrapper over `chrono::DateTime<Utc>`. In SQL, it's stored as an integer number of seconds since

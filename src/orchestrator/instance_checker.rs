@@ -118,18 +118,18 @@ fn process_checker_response(
             serde_json::from_str(&line)
                 .context(with_loc!("Failed to deserialize checker's response"))?
         } else {
-            return db::mark_dead(conn, target);
+            return db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target));
         }
     };
 
     match state {
         ipc::CheckerResponse::Peer { peer: _ } => {
-            db::mark_dead(conn, target)?;
+            db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
             ipc::InstanceState::Alive => {
-                db::mark_alive(conn, target)?;
+                db::on_sqlite_busy_retry(&mut || db::mark_alive(conn, target))?;
                 process_peers(logger, conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
@@ -137,7 +137,7 @@ fn process_checker_response(
             }
             ipc::InstanceState::Moved { to } => {
                 println!("{} has moved to {}", target, to);
-                db::mark_moved(conn, target, &to)?;
+                db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
             }
         },
     }
@@ -164,7 +164,7 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::add_instance(conn, &peer)?;
+                db::on_sqlite_busy_retry(&mut || db::add_instance(conn, &peer))?;
                 peers_count += 1;
             }
         }
