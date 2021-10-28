@@ -1,0 +1,13 @@
+#!/bin/sh
+
+curl \
+    --request POST \
+    --header 'Content-Type: application/json' \
+    --data '{"query": "{ nodes { domain status } }"}' \
+    'https://api.fediverse.observer' \
+| \
+jq '.data.nodes | map(.domain)' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
