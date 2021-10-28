@@ -10,8 +10,6 @@ const QUEUE_SIZE: usize = 10;
 /// This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
-const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_millis(10);
-
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
@@ -43,29 +41,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         Ok(())
     };
 
-    let is_sqlite_busy_error = |error: &anyhow::Error| -> bool {
-        if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
-            use libsqlite3_sys::{Error, ErrorCode};
-            use rusqlite::Error::SqliteFailure;
-
-            if let SqliteFailure(Error { code, .. }, _) = error {
-                return *code == ErrorCode::DatabaseBusy;
-            }
-        }
-
-        false
-    };
-
     loop {
-        if let Err(e) = iteration() {
-            if is_sqlite_busy_error(&e) {
-                // If some transaction couldn't be run because of a locked database, just wait
-                // a bit and try again.
-                std::thread::sleep(SLEEP_BETWEEN_ERRORS);
-            } else {
-                return Err(e);
-            }
-        }
+        db::on_sqlite_busy_retry_indefinitely(&mut iteration)?;
     }
 }
 

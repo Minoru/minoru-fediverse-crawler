@@ -8,6 +8,40 @@ use rusqlite::{
 };
 use url::Host;
 
+/// A helper that, upon encountering `SQLITE_BUSY`, just waits a bit and retries.
+pub fn on_sqlite_busy_retry_indefinitely<T, F>(f: &mut F) -> anyhow::Result<T>
+where
+    F: FnMut() -> anyhow::Result<T>,
+{
+    const SLEEP_BETWEEN_ERRORS: std::time::Duration = std::time::Duration::from_millis(10);
+
+    let is_sqlite_busy_error = |error: &anyhow::Error| -> bool {
+        if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
+            use libsqlite3_sys::{Error, ErrorCode};
+            use rusqlite::Error::SqliteFailure;
+
+            if let SqliteFailure(Error { code, .. }, _) = error {
+                return *code == ErrorCode::DatabaseBusy;
+            }
+        }
+
+        false
+    };
+
+    loop {
+        match f() {
+            result @ Ok(_) => return result,
+            Err(e) => {
+                if is_sqlite_busy_error(&e) {
+                    std::thread::sleep(SLEEP_BETWEEN_ERRORS);
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
+}
+
 /// Wrapper over `chrono::DateTime<Utc>`. In SQL, it's stored as an integer number of seconds since
 /// January 1, 1970.
 struct UnixTimestamp(DateTime<Utc>);
