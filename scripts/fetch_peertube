@@ -1,0 +1,11 @@
+#!/bin/sh
+
+curl \
+    --header 'Accept: application/json' \
+    'https://instances.joinpeertube.org/api/v1/instances/hosts?count=100000' \
+| \
+jq '.data | map(.host)' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
