@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 curl \
     --request POST \
     --header 'Content-Type: application/json' \
