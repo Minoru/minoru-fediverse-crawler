@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+curl \
+    --silent \
+    --header 'Content-Type: application/graphql' \
+    'https://the-federation.info/graphql?query=%7Bnodes(protocol%3A%20%22activitypub%22)%7Bhost%7D%7D' \
+| \
+jq '.data.nodes | map(.host)' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
