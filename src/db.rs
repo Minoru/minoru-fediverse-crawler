@@ -154,7 +154,6 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
             id INTEGER PRIMARY KEY NOT NULL,
             hostname TEXT UNIQUE NOT NULL,
             state REFERENCES states(id) NOT NULL DEFAULT 0,
-            last_check_datetime INTEGER DEFAULT NULL,
             next_check_datetime INTEGER DEFAULT (strftime('%s', CURRENT_TIMESTAMP))
         )",
         [],
@@ -262,7 +261,6 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     tx.execute(
         "UPDATE instances
         SET state = ?1,
-            last_check_datetime = strftime('%s', CURRENT_TIMESTAMP),
             next_check_datetime = ?2
         WHERE id = ?3",
         params![InstanceState::Alive, UnixTimestamp(next_check), instance_id],
@@ -303,15 +301,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
             tx.execute(
                 "UPDATE instances
                 SET state = ?1,
-                    last_check_datetime = ?2,
-                    next_check_datetime = ?3
-                WHERE id = ?4",
-                params![
-                    InstanceState::Dying,
-                    UnixTimestamp(now),
-                    UnixTimestamp(next_check),
-                    instance_id
-                ],
+                    next_check_datetime = ?2
+                WHERE id = ?3",
+                params![InstanceState::Dying, UnixTimestamp(next_check), instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
@@ -347,15 +339,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 tx.execute(
                     "UPDATE instances
                     SET state = ?1,
-                        last_check_datetime = ?2,
-                        next_check_datetime = ?3
-                    WHERE id = ?4",
-                    params![
-                        InstanceState::Dead,
-                        UnixTimestamp(now),
-                        UnixTimestamp(next_check),
-                        instance_id
-                    ],
+                        next_check_datetime = ?2
+                    WHERE id = ?3",
+                    params![InstanceState::Dead, UnixTimestamp(next_check), instance_id],
                 )
                 .context(with_loc!("Updating table 'instances'"))?;
             } else {
@@ -363,10 +349,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     .context(with_loc!("Picking next check's datetime"))?;
                 tx.execute(
                     "UPDATE instances
-                    SET last_check_datetime = ?1,
-                        next_check_datetime = ?2
-                    WHERE id = ?3",
-                    params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
+                    SET next_check_datetime = ?1
+                    WHERE id = ?2",
+                    params![UnixTimestamp(next_check), instance_id],
                 )
                 .context(with_loc!("Updating table 'instances'"))?;
             }
@@ -376,10 +361,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
             tx.execute(
                 "UPDATE instances
-                SET last_check_datetime = ?1,
-                    next_check_datetime = ?2
-                WHERE id = ?3",
-                params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
+                SET next_check_datetime = ?1
+                WHERE id = ?2",
+                params![UnixTimestamp(next_check), instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
@@ -428,12 +412,10 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             tx.execute(
                 "UPDATE instances
                 SET state = ?1,
-                    last_check_datetime = ?2,
-                    next_check_datetime = ?3
-                WHERE id = ?4",
+                    next_check_datetime = ?2
+                WHERE id = ?3",
                 params![
                     InstanceState::Moving,
-                    UnixTimestamp(now),
                     UnixTimestamp(next_check),
                     instance_id
                 ],
@@ -494,15 +476,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     tx.execute(
                         "UPDATE instances
                         SET state = ?1,
-                            last_check_datetime = ?2,
-                            next_check_datetime = ?3
-                        WHERE id = ?4",
-                        params![
-                            InstanceState::Moved,
-                            UnixTimestamp(now),
-                            UnixTimestamp(next_check),
-                            instance_id
-                        ],
+                            next_check_datetime = ?2
+                        WHERE id = ?3",
+                        params![InstanceState::Moved, UnixTimestamp(next_check), instance_id],
                     )
                     .context(with_loc!("Updating table 'instances'"))?;
                 } else {
@@ -510,10 +486,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         .context(with_loc!("Picking next check's datetime"))?;
                     tx.execute(
                         "UPDATE instances
-                        SET last_check_datetime = ?1,
-                            next_check_datetime = ?2
-                        WHERE id = ?3",
-                        params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
+                        SET next_check_datetime = ?1
+                        WHERE id = ?2",
+                        params![UnixTimestamp(next_check), instance_id],
                     )
                     .context(with_loc!("Updating table 'instances'"))?;
                 }
@@ -532,10 +507,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     .context(with_loc!("Picking next check's datetime"))?;
                 tx.execute(
                     "UPDATE instances
-                    SET last_check_datetime = ?1,
-                        next_check_datetime = ?2
-                    WHERE id = ?3",
-                    params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
+                    SET next_check_datetime = ?1
+                    WHERE id = ?2",
+                    params![UnixTimestamp(next_check), instance_id],
                 )
                 .context(with_loc!("Updating table 'instances'"))?;
             }
@@ -545,10 +519,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
             tx.execute(
                 "UPDATE instances
-                SET last_check_datetime = ?1,
-                    next_check_datetime = ?2
-                WHERE id = ?3",
-                params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
+                SET next_check_datetime = ?1
+                WHERE id = ?2",
+                params![UnixTimestamp(next_check), instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
