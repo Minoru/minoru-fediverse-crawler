@@ -229,11 +229,8 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
             let instance_id: i64 = row.get(0).context(with_loc!("Getting `instance_id`"))?;
             let next_check =
                 time::rand_datetime_today().context(with_loc!("Picking next check's datetime"))?;
-            tx.execute(
-                "UPDATE instances SET next_check_datetime = ?1 WHERE id = ?2",
-                params![UnixTimestamp(next_check), instance_id],
-            )
-            .context(with_loc!("Updating table 'instances'"))?;
+            reschedule_instance_to(&tx, instance_id, next_check)
+                .context(with_loc!("Rescheduling instance"))?;
         }
     }
 
@@ -258,12 +255,13 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     // Mark the instance alive and schedule the next check
     let next_check =
         time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
+    reschedule_instance_to(&tx, instance_id, next_check)
+        .context(with_loc!("Rescheduling instance"))?;
     tx.execute(
         "UPDATE instances
-        SET state = ?1,
-            next_check_datetime = ?2
-        WHERE id = ?3",
-        params![InstanceState::Alive, UnixTimestamp(next_check), instance_id],
+        SET state = ?1
+        WHERE id = ?2",
+        params![InstanceState::Alive, instance_id],
     )
     .context(with_loc!("Updating table 'instances'"))?;
 
@@ -298,12 +296,13 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
             .context(with_loc!("Inserting into table 'dying_state_data'"))?;
             let next_check =
                 time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
+            reschedule_instance_to(&tx, instance_id, next_check)
+                .context(with_loc!("Rescheduling instance"))?;
             tx.execute(
                 "UPDATE instances
-                SET state = ?1,
-                    next_check_datetime = ?2
-                WHERE id = ?3",
-                params![InstanceState::Dying, UnixTimestamp(next_check), instance_id],
+                SET state = ?1
+                WHERE id = ?2",
+                params![InstanceState::Dying, instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
@@ -336,36 +335,27 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     .context(with_loc!("Deleting from table 'dying_state_data'"))?;
                 let next_check = time::rand_datetime_weekly()
                     .context(with_loc!("Picking next check's datetime"))?;
+                reschedule_instance_to(&tx, instance_id, next_check)
+                    .context(with_loc!("Rescheduling instance"))?;
                 tx.execute(
                     "UPDATE instances
-                    SET state = ?1,
-                        next_check_datetime = ?2
-                    WHERE id = ?3",
-                    params![InstanceState::Dead, UnixTimestamp(next_check), instance_id],
+                    SET state = ?1
+                    WHERE id = ?2",
+                    params![InstanceState::Dead, instance_id],
                 )
                 .context(with_loc!("Updating table 'instances'"))?;
             } else {
                 let next_check = time::rand_datetime_daily()
                     .context(with_loc!("Picking next check's datetime"))?;
-                tx.execute(
-                    "UPDATE instances
-                    SET next_check_datetime = ?1
-                    WHERE id = ?2",
-                    params![UnixTimestamp(next_check), instance_id],
-                )
-                .context(with_loc!("Updating table 'instances'"))?;
+                reschedule_instance_to(&tx, instance_id, next_check)
+                    .context(with_loc!("Rescheduling instance"))?;
             }
         }
         InstanceState::Dead => {
             let next_check =
                 time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
-            tx.execute(
-                "UPDATE instances
-                SET next_check_datetime = ?1
-                WHERE id = ?2",
-                params![UnixTimestamp(next_check), instance_id],
-            )
-            .context(with_loc!("Updating table 'instances'"))?;
+            reschedule_instance_to(&tx, instance_id, next_check)
+                .context(with_loc!("Rescheduling instance"))?;
         }
     }
 
@@ -409,16 +399,13 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             .context(with_loc!("Inserting into 'moving_state_data'"))?;
             let next_check =
                 time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
+            reschedule_instance_to(&tx, instance_id, next_check)
+                .context(with_loc!("Rescheduling instance"))?;
             tx.execute(
                 "UPDATE instances
-                SET state = ?1,
-                    next_check_datetime = ?2
-                WHERE id = ?3",
-                params![
-                    InstanceState::Moving,
-                    UnixTimestamp(next_check),
-                    instance_id
-                ],
+                SET state = ?1
+                WHERE id = ?2",
+                params![InstanceState::Moving, instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
@@ -473,24 +460,20 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     .context(with_loc!("Inserting into 'moved_state_data'"))?;
                     let next_check = time::rand_datetime_weekly()
                         .context(with_loc!("Picking next check's datetime"))?;
+                    reschedule_instance_to(&tx, instance_id, next_check)
+                        .context(with_loc!("Rescheduling instance"))?;
                     tx.execute(
                         "UPDATE instances
-                        SET state = ?1,
-                            next_check_datetime = ?2
-                        WHERE id = ?3",
-                        params![InstanceState::Moved, UnixTimestamp(next_check), instance_id],
+                        SET state = ?1
+                        WHERE id = ?2",
+                        params![InstanceState::Moved, instance_id],
                     )
                     .context(with_loc!("Updating table 'instances'"))?;
                 } else {
                     let next_check = time::rand_datetime_daily()
                         .context(with_loc!("Picking next check's datetime"))?;
-                    tx.execute(
-                        "UPDATE instances
-                        SET next_check_datetime = ?1
-                        WHERE id = ?2",
-                        params![UnixTimestamp(next_check), instance_id],
-                    )
-                    .context(with_loc!("Updating table 'instances'"))?;
+                    reschedule_instance_to(&tx, instance_id, next_check)
+                        .context(with_loc!("Rescheduling instance"))?;
                 }
             } else {
                 // Previous checks got redirected to another host; restart the counts
@@ -505,25 +488,15 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 .context(with_loc!("Updating table 'moving_state_data'"))?;
                 let next_check = time::rand_datetime_daily()
                     .context(with_loc!("Picking next check's datetime"))?;
-                tx.execute(
-                    "UPDATE instances
-                    SET next_check_datetime = ?1
-                    WHERE id = ?2",
-                    params![UnixTimestamp(next_check), instance_id],
-                )
-                .context(with_loc!("Updating table 'instances'"))?;
+                reschedule_instance_to(&tx, instance_id, next_check)
+                    .context(with_loc!("Rescheduling instance"))?;
             }
         }
         InstanceState::Moved => {
             let next_check =
                 time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
-            tx.execute(
-                "UPDATE instances
-                SET next_check_datetime = ?1
-                WHERE id = ?2",
-                params![UnixTimestamp(next_check), instance_id],
-            )
-            .context(with_loc!("Updating table 'instances'"))?;
+            reschedule_instance_to(&tx, instance_id, next_check)
+                .context(with_loc!("Rescheduling instance"))?;
         }
     };
 
@@ -626,6 +599,21 @@ fn delete_moved_state_data(tx: &Transaction, id: i64) -> anyhow::Result<()> {
     )
     .map(|_| ())
     .context(with_loc!("Deleting from table 'moved_state_data'"))
+}
+
+fn reschedule_instance_to(
+    tx: &Transaction,
+    id: i64,
+    next_check_datetime: DateTime<Utc>,
+) -> anyhow::Result<()> {
+    tx.execute(
+        "UPDATE instances
+        SET next_check_datetime = ?1
+        WHERE id = ?2",
+        params![UnixTimestamp(next_check_datetime), id],
+    )
+    .map(|_| ())
+    .context(with_loc!("Updating table 'instances'"))
 }
 
 /// Picks the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
