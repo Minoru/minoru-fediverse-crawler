@@ -496,9 +496,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             let is_moving_to_that_host_already: u64 = tx
                 .query_row(
                     "SELECT count(id)
-                FROM moving_state_data
-                WHERE instance = ?1
-                    AND moving_to = ?2",
+                    FROM moving_state_data
+                    WHERE instance = ?1
+                        AND moving_to = ?2",
                     params![instance_id, to_instance_id],
                     |row| row.get(0),
                 )
@@ -517,8 +517,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 let (redirects_count, since): (u64, DateTime<Utc>) = tx
                     .query_row(
                         "SELECT redirects_count, moving_since
-                    FROM moving_state_data
-                    WHERE instance = ?1",
+                        FROM moving_state_data
+                        WHERE instance = ?1",
                         params![instance_id],
                         |row| {
                             let redirects_count = row.get(0)?;
@@ -615,8 +615,8 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     let mut statement = conn
         .prepare_cached(
             "INSERT OR IGNORE
-        INTO instances(hostname, next_check_datetime)
-        VALUES (?1, ?2)",
+            INTO instances(hostname, next_check_datetime)
+            VALUES (?1, ?2)",
         )
         .context(with_loc!("Preparing cached INSERT OR IGNORE statement"))?;
     let next_check =
