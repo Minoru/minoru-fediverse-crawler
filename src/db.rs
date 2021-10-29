@@ -84,7 +84,7 @@ impl FromSql for UnixTimestamp {
 }
 
 /// Instance states which are stored in the DB.
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum InstanceState {
     Discovered = 0,
     Alive = 1,
@@ -94,16 +94,23 @@ pub enum InstanceState {
     Moved = 5,
 }
 
-impl InstanceState {
-    pub fn from(i: u8) -> Option<Self> {
-        match i {
-            0 => Some(Self::Discovered),
-            1 => Some(Self::Alive),
-            2 => Some(Self::Dying),
-            3 => Some(Self::Dead),
-            4 => Some(Self::Moving),
-            5 => Some(Self::Moved),
-            _ => None,
+impl ToSql for InstanceState {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(*self as i64))
+    }
+}
+
+impl FromSql for InstanceState {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        let v = value.as_i64()?;
+        match v {
+            0 => Ok(Self::Discovered),
+            1 => Ok(Self::Alive),
+            2 => Ok(Self::Dying),
+            3 => Ok(Self::Dead),
+            4 => Ok(Self::Moving),
+            5 => Ok(Self::Moved),
+            _ => Err(rusqlite::types::FromSqlError::OutOfRange(v)),
         }
     }
 }
@@ -276,11 +283,7 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
             last_check_datetime = strftime('%s', CURRENT_TIMESTAMP),
             next_check_datetime = ?2
         WHERE id = ?3",
-        params![
-            InstanceState::Alive as u8,
-            UnixTimestamp(next_check),
-            instance_id
-        ],
+        params![InstanceState::Alive, UnixTimestamp(next_check), instance_id],
     )
     .context(with_loc!("Updating table 'instances'"))?;
 
@@ -324,7 +327,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 "INSERT
                 INTO dying_state_data(instance, previous_state, dying_since)
                 VALUES (?1, ?2, ?3)",
-                params![instance_id, state as u8, UnixTimestamp(now)],
+                params![instance_id, state, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into table 'dying_state_data'"))?;
             let next_check =
@@ -336,7 +339,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     next_check_datetime = ?3
                 WHERE id = ?4",
                 params![
-                    InstanceState::Dying as u8,
+                    InstanceState::Dying,
                     now.timestamp(),
                     UnixTimestamp(next_check),
                     instance_id
@@ -384,7 +387,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                         next_check_datetime = ?3
                     WHERE id = ?4",
                     params![
-                        InstanceState::Dead as u8,
+                        InstanceState::Dead,
                         now.timestamp(),
                         UnixTimestamp(next_check),
                         instance_id
@@ -468,7 +471,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             tx.execute(
                 "INSERT INTO moving_state_data(instance, previous_state, moving_since, moving_to)
                 VALUES (?1, ?2, ?3, ?4)",
-                params![instance_id, state as u8, to_instance_id, UnixTimestamp(now)],
+                params![instance_id, state, to_instance_id, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into 'moving_state_data'"))?;
             let next_check =
@@ -480,7 +483,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     next_check_datetime = ?3
                 WHERE id = ?4",
                 params![
-                    InstanceState::Moving as u8,
+                    InstanceState::Moving,
                     UnixTimestamp(now),
                     UnixTimestamp(next_check),
                     instance_id
@@ -555,7 +558,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                             next_check_datetime = ?3
                         WHERE id = ?4",
                         params![
-                            InstanceState::Moved as u8,
+                            InstanceState::Moved,
                             UnixTimestamp(now),
                             UnixTimestamp(next_check),
                             instance_id
@@ -665,15 +668,12 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
 }
 
 fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<InstanceState> {
-    let state = tx
-        .query_row(
-            "SELECT state FROM instances WHERE hostname = ?1",
-            params![instance.to_string()],
-            |row| row.get(0),
-        )
-        .context(with_loc!("Selecting 'state' from 'instances' table"))?;
-    InstanceState::from(state)
-        .ok_or_else(|| anyhow!("Got invalid instance state from the DB: {}", state))
+    tx.query_row(
+        "SELECT state FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )
+    .context(with_loc!("Selecting 'state' from 'instances' table"))
 }
 
 /// Picks the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
