@@ -308,7 +308,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 WHERE id = ?4",
                 params![
                     InstanceState::Dying,
-                    now.timestamp(),
+                    UnixTimestamp(now),
                     UnixTimestamp(next_check),
                     instance_id
                 ],
@@ -352,7 +352,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     WHERE id = ?4",
                     params![
                         InstanceState::Dead,
-                        now.timestamp(),
+                        UnixTimestamp(now),
                         UnixTimestamp(next_check),
                         instance_id
                     ],
@@ -366,7 +366,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     SET last_check_datetime = ?1,
                         next_check_datetime = ?2
                     WHERE id = ?3",
-                    params![now.timestamp(), UnixTimestamp(next_check), instance_id],
+                    params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
                 )
                 .context(with_loc!("Updating table 'instances'"))?;
             }
@@ -379,7 +379,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 SET last_check_datetime = ?1,
                     next_check_datetime = ?2
                 WHERE id = ?3",
-                params![now.timestamp(), UnixTimestamp(next_check), instance_id],
+                params![UnixTimestamp(now), UnixTimestamp(next_check), instance_id],
             )
             .context(with_loc!("Updating table 'instances'"))?;
         }
