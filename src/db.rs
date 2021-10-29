@@ -280,20 +280,32 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
+    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance's state"))?;
+    if state == InstanceState::Dead {
+        return Ok(());
+    }
+
+    assert_ne!(state, InstanceState::Dead);
+
     let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance's id"))?;
     let now = Utc::now();
 
-    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance's state"))?;
+    // Delete any unrelated state data for this instance
     match state {
+        InstanceState::Moving => delete_moving_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table 'moving_state_data'"))?,
+        InstanceState::Moved => delete_moved_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table 'moved_state_data'"))?,
+        _ => {}
+    }
+
+    match state {
+        InstanceState::Dead => {}
+
         InstanceState::Discovered
         | InstanceState::Alive
         | InstanceState::Moving
         | InstanceState::Moved => {
-            delete_moving_state_data(&tx, instance_id)
-                .context(with_loc!("Deleting from table 'moving_state_data'"))?;
-            delete_moved_state_data(&tx, instance_id)
-                .context(with_loc!("Deleting from table 'moved_state_data'"))?;
-
             tx.execute(
                 "INSERT
                 INTO dying_state_data(instance, previous_state, dying_since)
@@ -301,13 +313,11 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 params![instance_id, state, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into table 'dying_state_data'"))?;
-            let next_check =
-                time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
-            reschedule_instance_to(&tx, instance_id, next_check)
-                .context(with_loc!("Rescheduling instance"))?;
+
             set_instance_state(&tx, instance_id, InstanceState::Dying)
                 .context(with_loc!("Marking instance as dying"))?;
         }
+
         InstanceState::Dying => {
             tx.execute(
                 "UPDATE dying_state_data
@@ -316,6 +326,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 params![instance_id],
             )
             .context(with_loc!("Updating table 'dying_state_data'"))?;
+
             let (checks_count, since): (u64, DateTime<Utc>) = tx
                 .query_row(
                     "SELECT failed_checks_count, dying_since
@@ -341,18 +352,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                     .context(with_loc!("Rescheduling instance"))?;
                 set_instance_state(&tx, instance_id, InstanceState::Dead)
                     .context(with_loc!("Marking instance as dead"))?;
-            } else {
-                let next_check = time::rand_datetime_daily()
-                    .context(with_loc!("Picking next check's datetime"))?;
-                reschedule_instance_to(&tx, instance_id, next_check)
-                    .context(with_loc!("Rescheduling instance"))?;
             }
-        }
-        InstanceState::Dead => {
-            let next_check =
-                time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
-            reschedule_instance_to(&tx, instance_id, next_check)
-                .context(with_loc!("Rescheduling instance"))?;
         }
     }
 
