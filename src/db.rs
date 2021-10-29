@@ -249,24 +249,12 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance id"))?;
 
     // Delete any previous state data related to this instance
-    tx.execute(
-        "DELETE FROM dying_state_data
-        WHERE instance = ?1",
-        params![instance_id],
-    )
-    .context(with_loc!("Deleting from table `dying_state_data'"))?;
-    tx.execute(
-        "DELETE FROM moving_state_data
-        WHERE instance = ?1",
-        params![instance_id],
-    )
-    .context(with_loc!("Deleting from table 'moving_state_data'"))?;
-    tx.execute(
-        "DELETE FROM moved_state_data
-        WHERE instance = ?1",
-        params![instance_id],
-    )
-    .context(with_loc!("Deleting from table 'moved_state_data'"))?;
+    delete_dying_state_data(&tx, instance_id)
+        .context(with_loc!("Deleting from table `dying_state_data'"))?;
+    delete_moving_state_data(&tx, instance_id)
+        .context(with_loc!("Deleting from table 'moving_state_data'"))?;
+    delete_moved_state_data(&tx, instance_id)
+        .context(with_loc!("Deleting from table 'moved_state_data'"))?;
 
     // Mark the instance alive and schedule the next check
     let next_check =
@@ -298,18 +286,10 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
         | InstanceState::Alive
         | InstanceState::Moving
         | InstanceState::Moved => {
-            tx.execute(
-                "DELETE FROM moving_state_data
-                WHERE instance = ?1",
-                params![instance_id],
-            )
-            .context(with_loc!("Deleting from table 'moving_state_data'"))?;
-            tx.execute(
-                "DELETE FROM moved_state_data
-                WHERE instance = ?1",
-                params![instance_id],
-            )
-            .context(with_loc!("Deleting from table 'moved_state_data'"))?;
+            delete_moving_state_data(&tx, instance_id)
+                .context(with_loc!("Deleting from table 'moving_state_data'"))?;
+            delete_moved_state_data(&tx, instance_id)
+                .context(with_loc!("Deleting from table 'moved_state_data'"))?;
 
             tx.execute(
                 "INSERT
@@ -360,12 +340,8 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
                 .checked_sub_signed(Duration::weeks(1))
                 .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
             if checks_count > 7 && since > week_ago {
-                tx.execute(
-                    "DELETE FROM dying_state_data
-                    WHERE instance = ?1",
-                    params![instance_id],
-                )
-                .context(with_loc!("Deleting from table 'dying_state_data'"))?;
+                delete_dying_state_data(&tx, instance_id)
+                    .context(with_loc!("Deleting from table 'dying_state_data'"))?;
                 let next_check = time::rand_datetime_weekly()
                     .context(with_loc!("Picking next check's datetime"))?;
                 tx.execute(
@@ -426,12 +402,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         | InstanceState::Alive
         | InstanceState::Dying
         | InstanceState::Dead => {
-            tx.execute(
-                "DELETE FROM dying_state_data
-                WHERE instance = ?1",
-                params![instance_id],
-            )
-            .context(with_loc!("Deleting from table 'dying_state_data'"))?;
+            delete_dying_state_data(&tx, instance_id)
+                .context(with_loc!("Deleting from table 'dying_state_data'"))?;
 
             let next_check =
                 time::rand_datetime_today().context(with_loc!("Picking next check's datatime"))?;
@@ -509,12 +481,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     .checked_sub_signed(Duration::weeks(1))
                     .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
                 if redirects_count > 7 && since > week_ago {
-                    tx.execute(
-                        "DELETE FROM moving_state_data
-                        WHERE instance = ?1",
-                        params![instance_id],
-                    )
-                    .context(with_loc!("Deleting from 'moving_state_data'"))?;
+                    delete_moving_state_data(&tx, instance_id)
+                        .context(with_loc!("Deleting from 'moving_state_data'"))?;
                     tx.execute(
                         "INSERT INTO moved_state_data(instance, moved_to)
                         VALUES (?1, ?2)",
@@ -655,6 +623,36 @@ fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<Insta
         |row| row.get(0),
     )
     .context(with_loc!("Selecting 'state' from 'instances' table"))
+}
+
+fn delete_dying_state_data(tx: &Transaction, id: i64) -> anyhow::Result<()> {
+    tx.execute(
+        "DELETE FROM dying_state_data
+        WHERE instance = ?1",
+        params![id],
+    )
+    .map(|_| ())
+    .context(with_loc!("Deleting from table `dying_state_data'"))
+}
+
+fn delete_moving_state_data(tx: &Transaction, id: i64) -> anyhow::Result<()> {
+    tx.execute(
+        "DELETE FROM moving_state_data
+        WHERE instance = ?1",
+        params![id],
+    )
+    .map(|_| ())
+    .context(with_loc!("Deleting from table 'moving_state_data'"))
+}
+
+fn delete_moved_state_data(tx: &Transaction, id: i64) -> anyhow::Result<()> {
+    tx.execute(
+        "DELETE FROM moved_state_data
+        WHERE instance = ?1",
+        params![id],
+    )
+    .map(|_| ())
+    .context(with_loc!("Deleting from table 'moved_state_data'"))
 }
 
 /// Picks the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
