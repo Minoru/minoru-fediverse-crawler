@@ -242,23 +242,35 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
+    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
+    if state == InstanceState::Alive {
+        return Ok(());
+    }
+
+    assert_ne!(state, InstanceState::Alive);
+
     let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance id"))?;
 
     // Delete any previous state data related to this instance
-    delete_dying_state_data(&tx, instance_id)
-        .context(with_loc!("Deleting from table `dying_state_data'"))?;
-    delete_moving_state_data(&tx, instance_id)
-        .context(with_loc!("Deleting from table 'moving_state_data'"))?;
-    delete_moved_state_data(&tx, instance_id)
-        .context(with_loc!("Deleting from table 'moved_state_data'"))?;
+    match state {
+        InstanceState::Dying => delete_dying_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table `dying_state_data'"))?,
+        InstanceState::Moving => delete_moving_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table 'moving_state_data'"))?,
+        InstanceState::Moved => delete_moved_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table 'moved_state_data'"))?,
+        _ => {}
+    }
 
-    // Mark the instance alive and schedule the next check
-    let next_check =
-        time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
-    reschedule_instance_to(&tx, instance_id, next_check)
-        .context(with_loc!("Rescheduling instance"))?;
     set_instance_state(&tx, instance_id, InstanceState::Alive)
         .context(with_loc!("Marking instance as alive"))?;
+
+    if state == InstanceState::Dead || state == InstanceState::Moved {
+        let next_check =
+            time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
+        reschedule_instance_to(&tx, instance_id, next_check)
+            .context(with_loc!("Rescheduling instance"))?;
+    }
 
     tx.commit().context(with_loc!("Committing the transaction"))
 }
