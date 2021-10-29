@@ -364,18 +364,28 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
+    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
+    if state == InstanceState::Moved {
+        return Ok(());
+    }
+
+    assert_ne!(state, InstanceState::Moved);
+
     let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance's id"))?;
     let now = Utc::now();
 
-    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
+    if state == InstanceState::Dying {
+        delete_dying_state_data(&tx, instance_id)
+            .context(with_loc!("Deleting from table 'dying_state_data'"))?;
+    }
+
     match state {
+        InstanceState::Moved => {}
+
         InstanceState::Discovered
         | InstanceState::Alive
         | InstanceState::Dying
         | InstanceState::Dead => {
-            delete_dying_state_data(&tx, instance_id)
-                .context(with_loc!("Deleting from table 'dying_state_data'"))?;
-
             let next_check =
                 time::rand_datetime_today().context(with_loc!("Picking next check's datatime"))?;
             tx.execute(
@@ -394,13 +404,11 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 params![instance_id, state, to_instance_id, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into 'moving_state_data'"))?;
-            let next_check =
-                time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
-            reschedule_instance_to(&tx, instance_id, next_check)
-                .context(with_loc!("Rescheduling instance"))?;
+
             set_instance_state(&tx, instance_id, InstanceState::Moving)
                 .context(with_loc!("Marking instance as moving"))?;
         }
+
         InstanceState::Moving => {
             let to_instance_id =
                 get_instance_id(&tx, to).context(with_loc!("Getting instance id"))?;
@@ -456,11 +464,6 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         .context(with_loc!("Rescheduling instance"))?;
                     set_instance_state(&tx, instance_id, InstanceState::Moved)
                         .context(with_loc!("Marking instance as moved"))?;
-                } else {
-                    let next_check = time::rand_datetime_daily()
-                        .context(with_loc!("Picking next check's datetime"))?;
-                    reschedule_instance_to(&tx, instance_id, next_check)
-                        .context(with_loc!("Rescheduling instance"))?;
                 }
             } else {
                 // Previous checks got redirected to another host; restart the counts
@@ -473,17 +476,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                     params![UnixTimestamp(now), to_instance_id, instance_id],
                 )
                 .context(with_loc!("Updating table 'moving_state_data'"))?;
-                let next_check = time::rand_datetime_daily()
-                    .context(with_loc!("Picking next check's datetime"))?;
-                reschedule_instance_to(&tx, instance_id, next_check)
-                    .context(with_loc!("Rescheduling instance"))?;
             }
-        }
-        InstanceState::Moved => {
-            let next_check =
-                time::rand_datetime_weekly().context(with_loc!("Picking next check's datetime"))?;
-            reschedule_instance_to(&tx, instance_id, next_check)
-                .context(with_loc!("Rescheduling instance"))?;
         }
     };
 
