@@ -227,7 +227,7 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
             .context(with_loc!("Preparing a SELECT"))?;
         let mut ids = statement.query([])?;
         while let Some(row) = ids.next()? {
-            let instance_id: u64 = row.get(0).context(with_loc!("Getting `instance_id`"))?;
+            let instance_id: i64 = row.get(0).context(with_loc!("Getting `instance_id`"))?;
             let next_check =
                 time::rand_datetime_today().context(with_loc!("Picking next check's datetime"))?;
             tx.execute(
@@ -639,7 +639,7 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
-fn get_instance_id(tx: &Transaction, instance: &Host) -> anyhow::Result<u64> {
+fn get_instance_id(tx: &Transaction, instance: &Host) -> anyhow::Result<i64> {
     tx.query_row(
         "SELECT id FROM instances WHERE hostname = ?1",
         params![instance.to_string()],
