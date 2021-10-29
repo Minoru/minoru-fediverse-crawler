@@ -246,7 +246,7 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id = get_instance_id(&tx, instance)?;
+    let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance id"))?;
 
     // Delete any previous state data related to this instance
     tx.execute(
@@ -289,7 +289,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id = get_instance_id(&tx, instance)?;
+    let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance's id"))?;
     let now = Utc::now();
 
     let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance's state"))?;
@@ -417,7 +417,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id = get_instance_id(&tx, instance)?;
+    let instance_id = get_instance_id(&tx, instance).context(with_loc!("Getting instance's id"))?;
     let now = Utc::now();
 
     let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
