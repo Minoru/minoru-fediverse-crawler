@@ -1,3 +1,5 @@
+//! Functions to query and update the database, plus some helpers.
+
 use crate::{time, with_loc};
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
@@ -83,7 +85,7 @@ impl FromSql for UnixTimestamp {
     }
 }
 
-/// Instance states which are stored in the DB.
+/// Possible states of a Fediverse instance, mapped to integers used in the database.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum InstanceState {
     Discovered = 0,
@@ -115,6 +117,7 @@ impl FromSql for InstanceState {
     }
 }
 
+/// Connect to the database.
 pub fn open() -> anyhow::Result<Connection> {
     let conn = Connection::open("fediverse.observer.db")
         .context(with_loc!("Failed to initialize the database"))?;
@@ -123,6 +126,10 @@ pub fn open() -> anyhow::Result<Connection> {
     Ok(conn)
 }
 
+/// Initialize the database.
+///
+/// This is safe to run concurrently with other processes; it will do nothing if the database is
+/// already initialized.
 pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -211,6 +218,7 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+/// For any check whose time has already passed, move that check up to 26 hours from now.
 pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -237,6 +245,7 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+/// Note down that the instance is alive.
 pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -274,6 +283,10 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+/// Note down that the instance is dead.
+///
+/// This will first move the instance into a "dying" state, and after a week of calling this
+/// function, it will finally move the instance into the "dead" state.
 pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -357,6 +370,11 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+/// Note down that the instance has moved to another.
+///
+/// This will initially mark the instance with the "moving" state, and after calling this function
+/// for a week, it will finally mark the instance as "moved". Changing the target instance resets
+/// the count.
 pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -480,6 +498,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+/// Attempt to add an instance to the database. Does nothing if the instance is already known.
 pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
     let mut statement = conn
         .prepare_cached(
@@ -498,10 +517,6 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
 }
 
 /// Reschedule the instance according to its state.
-///
-/// This is meant to be used when the checker fails. In that case, we want to reschedule the
-/// instance sometime in the future, so we keep tracking it. We do this according to the current
-/// state of the instance, preserving the frequency of the checks.
 pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -602,7 +617,7 @@ fn set_instance_state(tx: &Transaction, id: i64, state: InstanceState) -> anyhow
     .context(with_loc!("Updating table 'instances'"))
 }
 
-/// Picks the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
+/// Pick the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
 pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Host, DateTime<Utc>)> {
     let (hostname, next_check_datetime): (String, DateTime<Utc>) = conn
         .query_row(

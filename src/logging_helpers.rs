@@ -1,7 +1,7 @@
-///! Macros to augment the logs.
+//! Macros to augment the logs.
 
 /// Turns a string literal into a closure that returns the same literal, but prefixed with the
-/// function path, line, and column.
+/// function's path and line number.
 ///
 /// This is meant to be used in conjunction with `anyhow::Context::context`:
 ///
