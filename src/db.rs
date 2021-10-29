@@ -246,13 +246,7 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id: u64 = tx
-        .query_row(
-            "SELECT id FROM instances WHERE hostname = ?1",
-            params![instance.to_string()],
-            |row| row.get(0),
-        )
-        .context(with_loc!("Getting instance's id"))?;
+    let instance_id = get_instance_id(&tx, instance)?;
 
     // Delete any previous state data related to this instance
     tx.execute(
@@ -295,13 +289,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id: u64 = tx
-        .query_row(
-            "SELECT id FROM instances WHERE hostname = ?1",
-            params![instance.to_string()],
-            |row| row.get(0),
-        )
-        .context(with_loc!("Getting instance's id"))?;
+    let instance_id = get_instance_id(&tx, instance)?;
     let now = Utc::now();
 
     let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance's state"))?;
@@ -429,13 +417,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let instance_id: u64 = tx
-        .query_row(
-            "SELECT id FROM instances WHERE hostname = ?1",
-            params![instance.to_string()],
-            |row| row.get(0),
-        )
-        .context(with_loc!("Getting instance's id"))?;
+    let instance_id = get_instance_id(&tx, instance)?;
     let now = Utc::now();
 
     let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
@@ -460,12 +442,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 params![to.to_string(), UnixTimestamp(next_check)],
             )
             .context(with_loc!("Inserting into table 'instances'"))?;
-            let to_instance_id: u64 = tx
-                .query_row(
-                    "SELECT id FROM instances WHERE hostname = ?1",
-                    params![to.to_string()],
-                    |row| row.get(0),
-                )
+            let to_instance_id = get_instance_id(&tx, to)
                 .context(with_loc!("Getting id of the newly inserted instance"))?;
 
             tx.execute(
@@ -492,13 +469,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             .context(with_loc!("Updating table 'instances'"))?;
         }
         InstanceState::Moving => {
-            let to_instance_id: u64 = tx
-                .query_row(
-                    "SELECT id FROM instances WHERE hostname = ?1",
-                    params![to.to_string()],
-                    |row| row.get(0),
-                )
-                .context(with_loc!("Getting instance id"))?;
+            let to_instance_id =
+                get_instance_id(&tx, to).context(with_loc!("Getting instance id"))?;
             let is_moving_to_that_host_already: u64 = tx
                 .query_row(
                     "SELECT count(id)
@@ -665,6 +637,15 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     .context(with_loc!("Updating table 'instances'"))?;
 
     tx.commit().context(with_loc!("Committing the transaction"))
+}
+
+fn get_instance_id(tx: &Transaction, instance: &Host) -> anyhow::Result<u64> {
+    tx.query_row(
+        "SELECT id FROM instances WHERE hostname = ?1",
+        params![instance.to_string()],
+        |row| row.get(0),
+    )
+    .context(with_loc!("Getting instance's id"))
 }
 
 fn get_instance_state(tx: &Transaction, instance: &Host) -> anyhow::Result<InstanceState> {
