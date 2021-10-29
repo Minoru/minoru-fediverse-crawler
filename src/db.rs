@@ -173,6 +173,7 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
         "CREATE TABLE IF NOT EXISTS dying_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
+            previous_state REFERENCES states(id) NOT NULL,
             dying_since INTEGER NOT NULL,
             failed_checks_count INTEGER NOT NULL DEFAULT 1
         )",
@@ -183,6 +184,7 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
         "CREATE TABLE IF NOT EXISTS moving_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
+            previous_state REFERENCES states(id) NOT NULL,
             moving_since INTEGER NOT NULL,
             redirects_count INTEGER NOT NULL DEFAULT 1,
             moving_to REFERENCES instances(id) NOT NULL
@@ -320,9 +322,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
 
             tx.execute(
                 "INSERT
-                INTO dying_state_data(instance, dying_since)
-                VALUES (?1, ?2)",
-                params![instance_id, UnixTimestamp(now)],
+                INTO dying_state_data(instance, previous_state, dying_since)
+                VALUES (?1, ?2, ?3)",
+                params![instance_id, state as u8, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into table 'dying_state_data'"))?;
             let next_check =
@@ -433,7 +435,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         .context(with_loc!("Getting instance's id"))?;
     let now = Utc::now();
 
-    match get_instance_state(&tx, instance)? {
+    let state = get_instance_state(&tx, instance).context(with_loc!("Getting instance state"))?;
+    match state {
         InstanceState::Discovered
         | InstanceState::Alive
         | InstanceState::Dying
@@ -463,9 +466,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 .context(with_loc!("Getting id of the newly inserted instance"))?;
 
             tx.execute(
-                "INSERT INTO moving_state_data(instance, moving_since, moving_to)
-                VALUES (?1, ?2, ?3)",
-                params![instance_id, to_instance_id, UnixTimestamp(now)],
+                "INSERT INTO moving_state_data(instance, previous_state, moving_since, moving_to)
+                VALUES (?1, ?2, ?3, ?4)",
+                params![instance_id, state as u8, to_instance_id, UnixTimestamp(now)],
             )
             .context(with_loc!("Inserting into 'moving_state_data'"))?;
             let next_check =
