@@ -14,7 +14,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     for instance in reader.lines() {
         let instance = instance?;
         info!(logger, "Manually adding {} to the database", instance);
-        db::add_instance(&conn, &Host::Domain(instance))?;
+        let host = Host::Domain(instance);
+        db::on_sqlite_busy_retry_indefinitely(&mut || db::add_instance(&conn, &host))?;
         // This is a pretty tight loop that hammers the database, but it's low-priority. Yield to
         // other threads in the hope that they have work to do.
         std::thread::yield_now();
