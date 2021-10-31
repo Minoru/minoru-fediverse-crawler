@@ -1,7 +1,7 @@
 use crate::{ipc, with_loc};
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{error, o, Logger};
+use slog::{error, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -13,10 +13,8 @@ pub fn run(logger: Logger, instance: Host) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     println!("Checking {}", instance);
 
-    let logger = logger.new(o!("host" => instance.to_string()));
-    if let Err(e) = check(logger.clone(), &mut conn, &instance) {
-        error!(logger, "{:?}", e);
-    }
+    let mut checker = CheckerHandle::new(logger.clone(), instance.clone())?;
+    process_checker_response(&logger, &mut conn, &instance, &mut checker.inner)?;
 
     Ok(())
 }
@@ -75,12 +73,6 @@ impl Drop for CheckerHandle {
             );
         }
     }
-}
-
-fn check(logger: Logger, conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
-    let mut checker = CheckerHandle::new(logger.clone(), instance.clone())?;
-    process_checker_response(&logger, conn, instance, &mut checker.inner)?;
-    Ok(())
 }
 
 fn process_checker_response(

@@ -1,6 +1,6 @@
 use crate::{db, with_loc};
 use anyhow::Context;
-use slog::{error, Logger};
+use slog::{error, o, Logger};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -46,7 +46,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         db::reschedule(&mut conn, &instance)
             .context(with_loc!("Orchestrator rescheduling an instance"))?;
 
-        let logger = logger.clone();
+        let logger = logger.new(o!("host" => instance.to_string()));
         pool.execute(move || {
             if let Err(e) = instance_checker::run(logger.clone(), instance) {
                 error!(logger, "Checker error: {:?}", e);
