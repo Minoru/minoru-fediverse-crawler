@@ -9,23 +9,16 @@ use url::Host;
 
 use crate::orchestrator::db;
 
-/// How long a checker would wait for new work before quitting.
-///
-/// Timeout of one second means we keep around as many workers as there are checks per second.
-const RECEIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-
-pub fn run(logger: Logger, rx: crossbeam_channel::Receiver<Host>) -> anyhow::Result<()> {
+pub fn run(logger: Logger, instance: Host) -> anyhow::Result<()> {
     let mut conn = db::open()?;
-    loop {
-        let instance = rx.recv_timeout(RECEIVE_TIMEOUT)?;
+    println!("Checking {}", instance);
 
-        println!("Checking {}", instance);
-
-        let logger = logger.new(o!("host" => instance.to_string()));
-        if let Err(e) = check(logger.clone(), &mut conn, &instance) {
-            error!(logger, "{:?}", e);
-        }
+    let logger = logger.new(o!("host" => instance.to_string()));
+    if let Err(e) = check(logger.clone(), &mut conn, &instance) {
+        error!(logger, "{:?}", e);
     }
+
+    Ok(())
 }
 
 struct CheckerHandle {
