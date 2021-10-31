@@ -1,6 +1,10 @@
 use crate::{db, with_loc};
 use anyhow::Context;
 use slog::{error, Logger};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 mod instance_checker;
 
@@ -23,6 +27,10 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     db::reschedule_missed_checks(&mut conn)?;
 
     let pool = rusty_pool::ThreadPool::new(CONSTANT_WORKERS, MAX_WORKERS, MAX_WORKER_IDLE_TIME);
+
+    let terminate = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(signal_hook::consts::SIGINT, terminate.clone())
+        .context(with_loc!("Setting up a SIGINT hook"))?;
 
     let mut iteration = || -> anyhow::Result<()> {
         let (instance, check_time) = db::pick_next_instance(&conn)
@@ -50,5 +58,12 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
 
     loop {
         db::on_sqlite_busy_retry_indefinitely(&mut iteration)?;
+        if terminate.load(Ordering::Relaxed) {
+            println!("Shutting down gracefully...");
+            break;
+        }
     }
+
+    pool.join();
+    Ok(())
 }
