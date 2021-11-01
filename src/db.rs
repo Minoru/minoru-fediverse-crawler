@@ -218,7 +218,7 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
-/// For any check whose time has already passed, move that check up to 26 hours from now.
+/// For any check whose time has already passed, move that check up to 24 hours from now.
 pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
@@ -354,7 +354,10 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
             let week_ago = now
                 .checked_sub_signed(Duration::weeks(1))
                 .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
-            if checks_count > 7 && since > week_ago {
+            // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
+            // "daily" checks per peal week. So 6 failed checks means "we've been failing for about
+            // a week".
+            if checks_count > 6 && since > week_ago {
                 delete_dying_state_data(&tx, instance_id)
                     .context(with_loc!("Deleting from table 'dying_state_data'"))?;
                 let next_check = time::about_a_week_from_now()
@@ -464,7 +467,10 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 let week_ago = now
                     .checked_sub_signed(Duration::weeks(1))
                     .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
-                if redirects_count > 7 && since > week_ago {
+                // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
+                // "daily" checks per peal week. So 6 redirects mean "we've been redirected for
+                // about a week".
+                if redirects_count > 6 && since > week_ago {
                     delete_moving_state_data(&tx, instance_id)
                         .context(with_loc!("Deleting from 'moving_state_data'"))?;
                     tx.execute(
