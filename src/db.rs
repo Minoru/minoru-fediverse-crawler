@@ -236,7 +236,7 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
         while let Some(row) = ids.next()? {
             let instance_id: i64 = row.get(0).context(with_loc!("Getting `instance_id`"))?;
             let next_check =
-                time::rand_datetime_today().context(with_loc!("Picking next check's datetime"))?;
+                time::sometime_today().context(with_loc!("Picking next check's datetime"))?;
             reschedule_instance_to(&tx, instance_id, next_check)
                 .context(with_loc!("Rescheduling instance"))?;
         }
@@ -275,7 +275,7 @@ pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
 
     if state == InstanceState::Dead || state == InstanceState::Moved {
         let next_check =
-            time::rand_datetime_daily().context(with_loc!("Picking next check's datetime"))?;
+            time::about_a_day_from_now().context(with_loc!("Picking next check's datetime"))?;
         reschedule_instance_to(&tx, instance_id, next_check)
             .context(with_loc!("Rescheduling instance"))?;
     }
@@ -357,7 +357,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
             if checks_count > 7 && since > week_ago {
                 delete_dying_state_data(&tx, instance_id)
                     .context(with_loc!("Deleting from table 'dying_state_data'"))?;
-                let next_check = time::rand_datetime_weekly()
+                let next_check = time::about_a_week_from_now()
                     .context(with_loc!("Picking next check's datetime"))?;
                 reschedule_instance_to(&tx, instance_id, next_check)
                     .context(with_loc!("Rescheduling instance"))?;
@@ -402,7 +402,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
         | InstanceState::Dying
         | InstanceState::Dead => {
             let next_check =
-                time::rand_datetime_today().context(with_loc!("Picking next check's datatime"))?;
+                time::sometime_today().context(with_loc!("Picking next check's datatime"))?;
             tx.execute(
                 "INSERT OR IGNORE
                 INTO instances(hostname, next_check_datetime)
@@ -473,7 +473,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                         params![instance_id, to_instance_id],
                     )
                     .context(with_loc!("Inserting into 'moved_state_data'"))?;
-                    let next_check = time::rand_datetime_weekly()
+                    let next_check = time::about_a_week_from_now()
                         .context(with_loc!("Picking next check's datetime"))?;
                     reschedule_instance_to(&tx, instance_id, next_check)
                         .context(with_loc!("Rescheduling instance"))?;
@@ -507,8 +507,7 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
             VALUES (?1, ?2)",
         )
         .context(with_loc!("Preparing cached INSERT OR IGNORE statement"))?;
-    let next_check =
-        time::rand_datetime_today().context(with_loc!("Picking next check's datetime"))?;
+    let next_check = time::sometime_today().context(with_loc!("Picking next check's datetime"))?;
     statement
         .execute(params![instance.to_string(), UnixTimestamp(next_check)])
         .context(with_loc!("Executing the statement"))?;
@@ -526,12 +525,12 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
         get_instance(&tx, instance).context(with_loc!("Getting instance id and state"))?;
 
     let next_check_datetime = match state {
-        InstanceState::Discovered => time::rand_datetime_daily(),
-        InstanceState::Alive => time::rand_datetime_daily(),
-        InstanceState::Dying => time::rand_datetime_daily(),
-        InstanceState::Dead => time::rand_datetime_weekly(),
-        InstanceState::Moving => time::rand_datetime_daily(),
-        InstanceState::Moved => time::rand_datetime_weekly(),
+        InstanceState::Discovered => time::about_a_day_from_now(),
+        InstanceState::Alive => time::about_a_day_from_now(),
+        InstanceState::Dying => time::about_a_day_from_now(),
+        InstanceState::Dead => time::about_a_week_from_now(),
+        InstanceState::Moving => time::about_a_day_from_now(),
+        InstanceState::Moved => time::about_a_week_from_now(),
     }
     .context(with_loc!("Picking next check's datetiem"))?;
 

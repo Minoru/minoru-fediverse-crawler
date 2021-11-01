@@ -17,17 +17,17 @@ fn randomize(fixed_offset: Duration) -> anyhow::Result<DateTime<Utc>> {
 }
 
 /// Random datetime about a day away from now (±2 hours).
-pub fn rand_datetime_daily() -> anyhow::Result<DateTime<Utc>> {
+pub fn about_a_day_from_now() -> anyhow::Result<DateTime<Utc>> {
     randomize(Duration::days(1))
 }
 
 /// Random datetime about a week away from now (±2 hours).
-pub fn rand_datetime_weekly() -> anyhow::Result<DateTime<Utc>> {
+pub fn about_a_week_from_now() -> anyhow::Result<DateTime<Utc>> {
     randomize(Duration::weeks(1))
 }
 
 /// Random datetime no further than 24 hours from now.
-pub fn rand_datetime_today() -> anyhow::Result<DateTime<Utc>> {
+pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
     const DAY: i64 = 24 * 60 * 60;
     let offset = Duration::seconds(fastrand::i64(0..DAY));
     Utc::now().checked_add_signed(offset).ok_or_else(|| {
