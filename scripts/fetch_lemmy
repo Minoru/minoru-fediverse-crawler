@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+curl \
+    --silent \
+    'https://raw.githubusercontent.com/LemmyNet/lemmy-instance-stats/main/stats.json' \
+| \
+jq '.instance_details | map(.domain)' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
