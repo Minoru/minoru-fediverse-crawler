@@ -4,9 +4,9 @@ set -e
 
 curl \
     --silent \
-    'https://the-federation.info/pods.json' \
+    'https://diasp.org/pods.json' \
 | \
-jq '.pods | map(.host)' \
+jq 'map(.host)' \
 | \
 grep --invert-match '^[][]' \
 | \
