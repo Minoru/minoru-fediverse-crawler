@@ -258,7 +258,7 @@ This video an async-await might come in handy for "orchestrator": https://fossto
 How to make this reliable enough for production: https://pythonspeed.com/fil/docs/fil4prod/reliable.html
 
 Peer lists in different Fedi software:
-- mastodon, pleroma, misskey, bookwyrm: api/v1/instance/peers
+- mastodon, pleroma, misskey, bookwyrm, smithereen: api/v1/instance/peers
 - peertube: server/following https://docs.joinpeertube.org/api-rest-reference.html#tag/Instance-Follows/paths/~1server~1followers~1{nameWithHost}~1accept/post
 
 ### Sandboxing

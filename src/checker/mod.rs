@@ -214,7 +214,7 @@ async fn get_peers(
     software: &str,
 ) -> anyhow::Result<Vec<Host>> {
     match software {
-        "mastodon" | "pleroma" | "misskey" | "bookwyrm" => {
+        "mastodon" | "pleroma" | "misskey" | "bookwyrm" | "smithereen" => {
             get_peers_mastodonish(logger, client, host).await
         }
         _ => Ok(vec![]),
