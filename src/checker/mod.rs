@@ -1,7 +1,7 @@
 mod http_client;
 
-use crate::{checker::http_client::HttpClient, ipc};
-use anyhow::anyhow;
+use crate::{checker::http_client::HttpClient, ipc, with_loc};
+use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use slog::{error, info, o, Logger};
 use tokio::runtime::Runtime;
@@ -23,7 +23,15 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
 
-    let hide_from_list = false;
+    let hide_from_list = {
+        match is_instance_private(&client, host, &software).await {
+            Ok(result) => result,
+            Err(e) => {
+                info!(logger, "Couldn't check if instance is private: {}", e);
+                false
+            }
+        }
+    };
     let alive = serde_json::to_string(&ipc::CheckerResponse::State {
         state: ipc::InstanceState::Alive { hide_from_list },
     })?;
@@ -174,6 +182,59 @@ async fn get_peers_mastodonish(
         .into_iter()
         .map(Host::Domain)
         .collect())
+}
+
+async fn is_instance_private(
+    client: &HttpClient,
+    host: &Host,
+    software: &str,
+) -> anyhow::Result<bool> {
+    match software {
+        "gnusocial" | "friendica" => {
+            let config = get_statusnet_config(client, host)
+                .await
+                .context(with_loc!("Fetching StatusNet config"))?;
+            let config =
+                json::parse(&config).context(with_loc!("Parsing StatusNet config as JSON"))?;
+            let is_private = config["site"]["private"].as_bool().unwrap_or(false);
+            Ok(is_private)
+        }
+
+        "hubzilla" => {
+            let siteinfo = get_siteinfo(client, host)
+                .await
+                .context(with_loc!("Fetching Siteinfo.json"))?;
+            let siteinfo = json::parse(&siteinfo).context(with_loc!("Parsing Siteinfo as JSON"))?;
+            let hide_in_statistics = siteinfo["hide_in_statistics"].as_bool().unwrap_or(false);
+            Ok(hide_in_statistics)
+        }
+
+        _ => Ok(false),
+    }
+}
+
+async fn get_statusnet_config(client: &HttpClient, host: &Host) -> anyhow::Result<String> {
+    let url = format!("https://{}/api/statusnet/config.json", host);
+    let response = client
+        .get(&url)
+        .await
+        .context(with_loc!("Requesting StatusNet config.json"))?
+        .text()
+        .await
+        .context(with_loc!("Getting a body of config.json response"))?;
+    Ok(response)
+}
+
+async fn get_siteinfo(client: &HttpClient, host: &Host) -> anyhow::Result<String> {
+    let url = format!("https://{}/siteinfo.json", host);
+    let response = client
+        .get(&url)
+        .await
+        .context(with_loc!("Requesting siteinfo.json"))?
+        .text()
+        .await
+        .context(with_loc!("Getting a body of siteinfo.json response"))?;
+    Ok(response)
 }
 
 #[cfg(test)]
