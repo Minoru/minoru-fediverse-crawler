@@ -45,6 +45,8 @@ use chrono::prelude::*;
 use chrono::Duration;
 use std::ops::RangeBounds;
 
+const DAY_HOURS: i64 = 29;
+
 fn now_plus_offset_plus_random_from_range(
     fixed_offset: Duration,
     range: impl RangeBounds<i64>,
@@ -61,7 +63,10 @@ fn now_plus_offset_plus_random_from_range(
 /// Random datetime about a day from now (now + 29 hours ± 2 hours).
 pub fn about_a_day_from_now() -> anyhow::Result<DateTime<Utc>> {
     const TWO_HOURS_SECS: i64 = 2 * 60 * 60;
-    now_plus_offset_plus_random_from_range(Duration::hours(29), -TWO_HOURS_SECS..=TWO_HOURS_SECS)
+    now_plus_offset_plus_random_from_range(
+        Duration::hours(DAY_HOURS),
+        -TWO_HOURS_SECS..=TWO_HOURS_SECS,
+    )
 }
 
 /// Random datetime about a week away from now (now + 167 hours ± 11.5 hours).
@@ -73,8 +78,8 @@ pub fn about_a_week_from_now() -> anyhow::Result<DateTime<Utc>> {
     )
 }
 
-/// Random datetime no further than 24 hours from now.
+/// Random datetime no further than 29 hours from now.
 pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
-    const DAY_SECS: i64 = 24 * 60 * 60;
+    const DAY_SECS: i64 = DAY_HOURS * 60 * 60;
     now_plus_offset_plus_random_from_range(Duration::zero(), 0..=DAY_SECS)
 }
