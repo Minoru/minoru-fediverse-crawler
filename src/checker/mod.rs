@@ -23,8 +23,9 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
 
+    let hide_from_list = false;
     let alive = serde_json::to_string(&ipc::CheckerResponse::State {
-        state: ipc::InstanceState::Alive,
+        state: ipc::InstanceState::Alive { hide_from_list },
     })?;
     println!("{}", alive);
 

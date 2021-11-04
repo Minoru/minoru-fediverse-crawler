@@ -104,8 +104,8 @@ fn process_checker_response(
             bail!("Expected the checker to respond with State, but it responded with Peer");
         }
         ipc::CheckerResponse::State { state } => match state {
-            ipc::InstanceState::Alive => {
-                db::on_sqlite_busy_retry(&mut || db::mark_alive(conn, target, false))?;
+            ipc::InstanceState::Alive { hide_from_list } => {
+                db::on_sqlite_busy_retry(&mut || db::mark_alive(conn, target, hide_from_list))?;
                 process_peers(logger, conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
