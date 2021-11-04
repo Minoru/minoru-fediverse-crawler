@@ -256,15 +256,25 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
 }
 
 /// Note down that the instance is alive.
-pub fn mark_alive(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+pub fn mark_alive(
+    conn: &mut Connection,
+    instance: &Host,
+    hide_from_list: bool,
+) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
     let (instance_id, state) =
         get_instance(&tx, instance).context(with_loc!("Getting instance id and state"))?;
+
+    set_hide_instance_from_list(&tx, instance_id, hide_from_list)
+        .context(with_loc!("Updating the flag in `hidden_instances`"))?;
+
     if state == InstanceState::Alive {
-        return Ok(());
+        return tx
+            .commit()
+            .context(with_loc!("Committing the transaction early"));
     }
 
     assert_ne!(state, InstanceState::Alive);
@@ -368,6 +378,8 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
             // "daily" checks per peal week. So 6 failed checks means "we've been failing for about
             // a week".
             if checks_count > 6 && since > week_ago {
+                delete_from_hidden_instances(&tx, instance_id)
+                    .context(with_loc!("Deleting from 'hidden_instances'"))?;
                 delete_dying_state_data(&tx, instance_id)
                     .context(with_loc!("Deleting from table 'dying_state_data'"))?;
                 let next_check = time::about_a_week_from_now()
@@ -481,6 +493,8 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
                 // "daily" checks per peal week. So 6 redirects mean "we've been redirected for
                 // about a week".
                 if redirects_count > 6 && since > week_ago {
+                    delete_from_hidden_instances(&tx, instance_id)
+                        .context(with_loc!("Deleting from 'hidden_instances'"))?;
                     delete_moving_state_data(&tx, instance_id)
                         .context(with_loc!("Deleting from 'moving_state_data'"))?;
                     tx.execute(
@@ -649,4 +663,27 @@ pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Host, DateTime<U
         )
         .context(with_loc!("Picking next instance"))?;
     Ok((Host::Domain(hostname), next_check_datetime))
+}
+
+fn set_hide_instance_from_list(
+    tx: &Transaction,
+    instance: i64,
+    hide_from_list: bool,
+) -> anyhow::Result<()> {
+    tx.execute(
+        "INSERT OR REPLACE
+        INTO hidden_instances(instance, hide_from_list)
+        VALUES (?1, ?2)",
+        params![instance, hide_from_list],
+    )?;
+    Ok(())
+}
+
+fn delete_from_hidden_instances(tx: &Transaction, instance: i64) -> anyhow::Result<()> {
+    tx.execute(
+        "DELETE FROM hidden_instances
+        WHERE instance = ?1",
+        params![instance],
+    )?;
+    Ok(())
 }

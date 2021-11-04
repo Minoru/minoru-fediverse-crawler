@@ -105,7 +105,7 @@ fn process_checker_response(
         }
         ipc::CheckerResponse::State { state } => match state {
             ipc::InstanceState::Alive => {
-                db::on_sqlite_busy_retry(&mut || db::mark_alive(conn, target))?;
+                db::on_sqlite_busy_retry(&mut || db::mark_alive(conn, target, false))?;
                 process_peers(logger, conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
