@@ -12,7 +12,11 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
     info!(logger, "Started Tokio runtime");
 
     let logger = logger.new(o!("host" => host.to_string()));
-    rt.block_on(async_main(&logger, &host))
+    if let Err(e) = rt.block_on(async_main(&logger, &host)) {
+        error!(logger, "{:?}", e);
+        return Err(e);
+    }
+    Ok(())
 }
 
 async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
