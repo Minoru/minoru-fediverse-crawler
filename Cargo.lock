@@ -212,10 +212,12 @@ dependencies = [
  "anyhow",
  "chrono",
  "fastrand",
+ "futures",
  "json",
  "lexopt",
  "libsqlite3-sys",
  "reqwest",
+ "robotstxt",
  "rusqlite",
  "rusty_pool",
  "serde",
@@ -929,6 +931,12 @@ dependencies = [
  "web-sys",
  "winreg",
 ]
+
+[[package]]
+name = "robotstxt"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbc52377db80e3fec3a2c748ca603b8b6cacdd34ff89ff4b742a635361d4b4a7"
 
 [[package]]
 name = "rusqlite"

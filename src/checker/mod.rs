@@ -18,7 +18,7 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
 async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
-    let client = HttpClient::new(logger)?;
+    let client = HttpClient::new(logger, host).await?;
 
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
