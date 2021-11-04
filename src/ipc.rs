@@ -4,7 +4,10 @@ use url::Host;
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum InstanceState {
     /// The instance is alive (it responded with a valid NodeInfo document).
-    Alive,
+    Alive {
+        /// Instance doesn't want to appear in public statistics.
+        hide_from_list: bool,
+    },
 
     /// The instance responded with a temporary redirect (HTTP codes 302, 303, 307).
     Moving { to: Host },
