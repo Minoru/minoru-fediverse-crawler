@@ -215,6 +215,16 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     )
     .context(with_loc!("Creating table 'moved_state_data'"))?;
 
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS hidden_instances(
+            id INTEGER PRIMARY KEY NOT NULL,
+            instance REFERENCES instances(id) NOT NULL UNIQUE,
+            hide_from_list INTEGER NOT NULL DEFAULT 0
+        )",
+        [],
+    )
+    .context(with_loc!("Creating table hidden_instances"))?;
+
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
