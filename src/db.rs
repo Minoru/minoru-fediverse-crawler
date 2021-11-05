@@ -221,6 +221,15 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     )
     .context(with_loc!("Creating table 'moving_state_data'"))?;
     tx.execute(
+        "CREATE INDEX IF NOT EXISTS moving_state_data_previous_state_instance
+        ON moving_state_data(previous_state, instance)",
+        [],
+    )
+    .context(with_loc!(
+        "Creating index 'moving_state_data_previous_state_instance'"
+    ))?;
+
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS moved_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
             instance REFERENCES instances(id) NOT NULL UNIQUE,
@@ -464,7 +473,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
             tx.execute(
                 "INSERT INTO moving_state_data(instance, previous_state, moving_since, moving_to)
                 VALUES (?1, ?2, ?3, ?4)",
-                params![instance_id, state, to_instance_id, UnixTimestamp(now)],
+                params![instance_id, state, UnixTimestamp(now), to_instance_id],
             )
             .context(with_loc!("Inserting into 'moving_state_data'"))?;
 

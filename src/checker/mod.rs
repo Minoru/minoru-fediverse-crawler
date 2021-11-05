@@ -1,6 +1,9 @@
 mod http_client;
 
-use crate::{checker::http_client::HttpClient, ipc, with_loc};
+use crate::{
+    checker::http_client::{HttpClient, HttpClientError},
+    ipc, with_loc,
+};
 use anyhow::{anyhow, Context};
 use serde::Deserialize;
 use slog::{error, info, o, Logger};
@@ -18,7 +21,43 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
 async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     info!(logger, "Started the checker");
 
-    let client = HttpClient::new(logger, host).await?;
+    // Here we handle results of redirects. If we don't call `println!` here, the Orchestrator will
+    // mark the host as dead.
+    if let Err(e) = try_check(logger, host).await {
+        if let Some(error) = e.downcast_ref::<HttpClientError>() {
+            match error {
+                HttpClientError::Moving { to, .. } => {
+                    if let Some(to) = to.host().map(|h| h.to_owned()) {
+                        let moving = serde_json::to_string(&ipc::CheckerResponse::State {
+                            state: ipc::InstanceState::Moving { to },
+                        })?;
+                        println!("{}", moving);
+                    }
+                }
+
+                HttpClientError::Moved { to, .. } => {
+                    if let Some(to) = to.host().map(|h| h.to_owned()) {
+                        let moved = serde_json::to_string(&ipc::CheckerResponse::State {
+                            state: ipc::InstanceState::Moved { to },
+                        })?;
+                        println!("{}", moved);
+                    }
+                }
+
+                // Propagate all other errors upwards. A lack of response from the checker will
+                // make the orchestrator to mark this host as dead.
+                _ => {}
+            }
+        }
+
+        return Err(e);
+    }
+
+    Ok(())
+}
+
+async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
+    let client = HttpClient::new(host).await?;
 
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);
