@@ -39,7 +39,7 @@
 //! a check for a newly discovered instance. This is an initial check, so it's not periodic. We
 //! still employ randomness though, so when a bunch  of instances are added simultaneously, they
 //! won't all get scheduled onto the same time. The amount of randomness is bigger than with the
-//! other two functions; it's any number of seconds from 0 to 24 hours (both inclusive).
+//! other two functions; it's any number of seconds from 0 to 29 hours (both inclusive).
 use anyhow::anyhow;
 use chrono::prelude::*;
 use chrono::Duration;
