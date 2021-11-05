@@ -3,3 +3,4 @@
 /fediverse.observer.db-journal
 /fediverse.observer.db-shm
 /fediverse.observer.db-wal
+/instances.json

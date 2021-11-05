@@ -181,6 +181,12 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
     .context(with_loc!(
         "Creating index on instances(next_check_datetime)"
     ))?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS instances_states_hostname
+        ON instances(state, hostname)",
+        [],
+    )
+    .context(with_loc!("Creating index 'instances_states_hostname'"))?;
 
     tx.execute(
         "CREATE TABLE IF NOT EXISTS dying_state_data(
@@ -193,6 +199,15 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
         [],
     )
     .context(with_loc!("Creating table 'dying_state_data'"))?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS dying_state_data_previous_state_instance
+        ON dying_state_data(previous_state, instance)",
+        [],
+    )
+    .context(with_loc!(
+        "Creating index 'dying_state_data_previous_state_instance'"
+    ))?;
+
     tx.execute(
         "CREATE TABLE IF NOT EXISTS moving_state_data(
             id INTEGER PRIMARY KEY NOT NULL,
@@ -224,6 +239,14 @@ pub fn init(conn: &mut Connection) -> anyhow::Result<()> {
         [],
     )
     .context(with_loc!("Creating table hidden_instances"))?;
+    tx.execute(
+        "CREATE INDEX IF NOT EXISTS hidden_instances_hide_from_list_instance
+        ON hidden_instances(hide_from_list, instance)",
+        [],
+    )
+    .context(with_loc!(
+        "Creating index 'hidden_instances_hide_from_list_instance'"
+    ))?;
 
     tx.commit().context(with_loc!("Committing the transaction"))
 }

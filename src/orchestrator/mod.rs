@@ -7,6 +7,7 @@ use std::sync::{
 };
 
 mod instance_checker;
+mod list_generator;
 
 /// This has to be a large-ish number, so Orchestrator can out-starve any other thread
 const SQLITE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
@@ -32,7 +33,29 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     signal_hook::flag::register(signal_hook::consts::SIGINT, terminate.clone())
         .context(with_loc!("Setting up a SIGINT hook"))?;
 
+    let mut time_to_generate_a_list = chrono::offset::Utc::now();
+
     let mut iteration = || -> anyhow::Result<()> {
+        if time_to_generate_a_list < chrono::offset::Utc::now() {
+            let logger = logger.new(o!("list_generation" => "true"));
+            pool.execute(move || {
+                let task = {
+                    let logger = logger.clone();
+                    move || {
+                        if let Err(e) = list_generator::generate(logger.clone()) {
+                            error!(logger, "List generator error: {:?}", e);
+                        }
+                    }
+                };
+
+                if let Err(e) = std::panic::catch_unwind(task) {
+                    error!(logger, "List generator panicked: {:?}", e);
+                }
+            });
+
+            time_to_generate_a_list = crate::time::in_about_half_an_hour()?;
+        }
+
         let (instance, check_time) = db::pick_next_instance(&conn)
             .context(with_loc!("Orchestrator picking next instance"))?;
         let wait = check_time - chrono::offset::Utc::now();

@@ -225,6 +225,7 @@ dependencies = [
  "signal-hook",
  "slog",
  "slog-journald",
+ "tempfile",
  "tokio",
  "url",
 ]
