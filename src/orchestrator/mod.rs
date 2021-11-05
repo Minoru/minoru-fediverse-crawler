@@ -48,8 +48,17 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
 
         let logger = logger.new(o!("host" => instance.to_string()));
         pool.execute(move || {
-            if let Err(e) = instance_checker::run(logger.clone(), instance) {
-                error!(logger, "Checker error: {:?}", e);
+            let task = {
+                let logger = logger.clone();
+                move || {
+                    if let Err(e) = instance_checker::run(logger.clone(), instance) {
+                        error!(logger, "Checker error: {:?}", e);
+                    }
+                }
+            };
+
+            if let Err(e) = std::panic::catch_unwind(task) {
+                error!(logger, "Checker panicked: {:?}", e);
             }
         });
 
