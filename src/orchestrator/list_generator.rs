@@ -31,12 +31,14 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
 
             UNION
 
-            SELECT hostname
+            SELECT instances.hostname
             FROM instances
                 JOIN moving_state_data ON instances.id = moving_state_data.instance
                 JOIN hidden_instances ON instances.id = hidden_instances.instance
-            WHERE state = 4
+                JOIN instances AS moved_to_instance ON moving_state_data.moving_to = moved_to_instance.id
+            WHERE instances.state = 4
                 AND previous_state = 1
+                AND moved_to_instance.state != 1
                 AND hide_from_list = 0",
         )
         .context(with_loc!("Preparing a SELECT"))?;
