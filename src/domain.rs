@@ -11,7 +11,10 @@ pub struct Domain {
 impl Domain {
     /// Construct from an arbitrary string.
     pub fn from_str(domain: &str) -> anyhow::Result<Self> {
-        let name = match addr::parse_domain_name(domain) {
+        // `addr` only works with lowercase.
+        let domain = domain.to_lowercase();
+
+        let name = match addr::parse_domain_name(&domain) {
             Err(e) => bail!("Parsing domain name {} failed: {}", domain, e),
             Ok(name) => name,
         };
