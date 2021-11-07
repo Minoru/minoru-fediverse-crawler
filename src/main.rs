@@ -4,6 +4,7 @@ use url::Host;
 
 mod checker;
 mod db;
+mod domain;
 mod instance_adder;
 mod ipc;
 mod logging_helpers;
@@ -67,45 +68,5 @@ fn logged_main(logger: Logger) -> anyhow::Result<()> {
                 checker::main(logger, host)
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn what_addr_accepts_and_rejects() {
-        use addr::parse_domain_name;
-
-        // Full URLs
-        assert!(parse_domain_name("http://example.org/hello").is_err());
-        assert!(parse_domain_name("http://bar.example.org/goodbye#world").is_err());
-        assert!(parse_domain_name("https://example.com/and/a/path?with=option").is_err());
-        assert!(parse_domain_name("https://foo.example.com:81/and/a/path?with=option").is_err());
-
-        // IP addresses
-        assert!(parse_domain_name("8.8.8.8").is_err());
-        assert!(parse_domain_name("127.0.0.1").is_err());
-        assert!(parse_domain_name("2001:4860:4860::8888").is_err());
-        assert!(parse_domain_name("[2001:4860:4860::8888]").is_err());
-        assert!(parse_domain_name("::1").is_err());
-        assert!(parse_domain_name("[::1]").is_err());
-
-        // Onion hidden services
-        assert!(parse_domain_name("yzw45do3yrjfnbpr.onion")
-            .unwrap()
-            .is_icann());
-        assert!(parse_domain_name(
-            "zlzvfg5zcehs2t4qcm7woogyywfzwvrduqujsnehrjeg3tndn6a55nqd.onion"
-        )
-        .unwrap()
-        .is_icann());
-
-        // I2P
-        assert!(!parse_domain_name("example.i2p").unwrap().is_icann());
-
-        // OpenNIC
-        assert!(!parse_domain_name("outdated.bbs").unwrap().is_icann());
-        // This one is dropped from OpenNIC and is coming to "real" DNS soon
-        assert!(parse_domain_name("this.one.is.free").unwrap().is_icann());
     }
 }

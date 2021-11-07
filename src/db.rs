@@ -1,6 +1,6 @@
 //! Functions to query and update the database, plus some helpers.
 
-use crate::{time, with_loc};
+use crate::{domain::Domain, time, with_loc};
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use rusqlite::{
@@ -8,7 +8,6 @@ use rusqlite::{
     types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef},
     Connection, ToSql, Transaction,
 };
-use url::Host;
 
 fn is_sqlite_busy_error(error: &anyhow::Error) -> bool {
     if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
@@ -290,7 +289,7 @@ pub fn reschedule_missed_checks(conn: &mut Connection) -> anyhow::Result<()> {
 /// Note down that the instance is alive.
 pub fn mark_alive(
     conn: &mut Connection,
-    instance: &Host,
+    instance: &Domain,
     hide_from_list: bool,
 ) -> anyhow::Result<()> {
     let tx = conn
@@ -339,7 +338,7 @@ pub fn mark_alive(
 ///
 /// This will first move the instance into a "dying" state, and after a week of calling this
 /// function, it will finally move the instance into the "dead" state.
-pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
@@ -432,7 +431,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
 /// This will initially mark the instance with the "moving" state, and after calling this function
 /// for a week, it will finally mark the instance as "moved". Changing the target instance resets
 /// the count.
-pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::Result<()> {
+pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
@@ -561,7 +560,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Host, to: &Host) -> anyhow::
 }
 
 /// Attempt to add an instance to the database. Does nothing if the instance is already known.
-pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
+pub fn add_instance(conn: &Connection, instance: &Domain) -> anyhow::Result<()> {
     let mut statement = conn
         .prepare_cached(
             "INSERT OR IGNORE
@@ -578,7 +577,7 @@ pub fn add_instance(conn: &Connection, instance: &Host) -> anyhow::Result<()> {
 }
 
 /// Reschedule the instance according to its state.
-pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> {
+pub fn reschedule(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()> {
     let tx = conn
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
@@ -607,7 +606,7 @@ pub fn reschedule(conn: &mut Connection, instance: &Host) -> anyhow::Result<()> 
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
-fn get_instance(tx: &Transaction, instance: &Host) -> anyhow::Result<(i64, InstanceState)> {
+fn get_instance(tx: &Transaction, instance: &Domain) -> anyhow::Result<(i64, InstanceState)> {
     tx.query_row(
         "SELECT id, state
         FROM instances
@@ -679,7 +678,7 @@ fn set_instance_state(tx: &Transaction, id: i64, state: InstanceState) -> anyhow
 }
 
 /// Pick the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
-pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Host, DateTime<Utc>)> {
+pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Domain, DateTime<Utc>)> {
     let (hostname, next_check_datetime): (String, DateTime<Utc>) = conn
         .query_row(
             "SELECT hostname, next_check_datetime
@@ -694,7 +693,8 @@ pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Host, DateTime<U
             },
         )
         .context(with_loc!("Picking next instance"))?;
-    Ok((Host::Domain(hostname), next_check_datetime))
+    let domain = Domain::from_str(&hostname)?;
+    Ok((domain, next_check_datetime))
 }
 
 fn set_hide_instance_from_list(

@@ -1,15 +1,12 @@
-use crate::{ipc, with_loc};
+use crate::{domain::Domain, ipc, orchestrator::db, with_loc};
 use anyhow::{anyhow, bail, Context};
 use rusqlite::Connection;
-use slog::{error, Logger};
+use slog::{error, info, Logger};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use url::Host;
 
-use crate::orchestrator::db;
-
-pub fn run(logger: Logger, instance: Host) -> anyhow::Result<()> {
+pub fn run(logger: Logger, instance: Domain) -> anyhow::Result<()> {
     let mut conn = db::open()?;
     println!("Checking {}", instance);
 
@@ -22,11 +19,11 @@ pub fn run(logger: Logger, instance: Host) -> anyhow::Result<()> {
 struct CheckerHandle {
     inner: Child,
     logger: Logger,
-    instance: Host,
+    instance: Domain,
 }
 
 impl CheckerHandle {
-    fn new(logger: Logger, instance: Host) -> anyhow::Result<Self> {
+    fn new(logger: Logger, instance: Domain) -> anyhow::Result<Self> {
         let exe_path = env::current_exe()?;
 
         let inner = Command::new(exe_path)
@@ -78,7 +75,7 @@ impl Drop for CheckerHandle {
 fn process_checker_response(
     logger: &Logger,
     conn: &mut Connection,
-    target: &Host,
+    target: &Domain,
     checker: &mut Child,
 ) -> anyhow::Result<()> {
     let output = checker
@@ -116,13 +113,25 @@ fn process_checker_response(
                 db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
             }
             ipc::InstanceState::Moved { to } => {
-                if &to == target {
-                    println!("{} has moved to *itself*, marking as dead", target);
-                    db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
-                } else {
-                    println!("{} has moved to {}", target, to);
-                    db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
-                }
+                match Domain::from_host(&to) {
+                    Ok(to) => {
+                        if &to == target {
+                            println!("{} has moved to *itself*, marking as dead", target);
+                            db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
+                        } else {
+                            println!("{} has moved to {}", target, to);
+                            db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
+                        }
+                    }
+
+                    Err(e) => {
+                        println!(
+                            "{} has moved to {}, which is not a valid domain name ({}); marking as dead",
+                            target, to, e
+                        );
+                        db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
+                    }
+                };
             }
         },
     }
@@ -131,9 +140,9 @@ fn process_checker_response(
 }
 
 fn process_peers(
-    _logger: &Logger,
+    logger: &Logger,
     conn: &mut Connection,
-    target: &Host,
+    target: &Domain,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
     let mut peers_count = 0;
@@ -149,8 +158,13 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                db::on_sqlite_busy_retry(&mut || db::add_instance(conn, &peer))?;
-                peers_count += 1;
+                if let Err(e) = Domain::from_host(&peer).and_then(|peer| {
+                    db::on_sqlite_busy_retry(&mut || db::add_instance(conn, &peer))
+                }) {
+                    info!(logger, "Failed to add {} to the database: {:?}", peer, e);
+                } else {
+                    peers_count += 1;
+                }
             }
         }
     }
