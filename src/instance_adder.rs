@@ -1,7 +1,6 @@
-use crate::db;
-use slog::{info, Logger};
+use crate::{db, domain::Domain};
+use slog::{error, info, Logger};
 use std::io::{self, BufRead};
-use url::Host;
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
@@ -11,11 +10,33 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     let stdin = stdin.lock();
     let reader = io::BufReader::new(stdin);
 
-    for instance in reader.lines() {
-        let instance = instance?;
-        info!(logger, "Manually adding {} to the database", instance);
-        let host = Host::Domain(instance);
-        db::on_sqlite_busy_retry_indefinitely(&mut || db::add_instance(&conn, &host))?;
+    for domain in reader.lines() {
+        let domain = domain?;
+        let domain = match Domain::from_str(&domain) {
+            Err(e) => {
+                let msg = format!(
+                    "Couldn't manually add {}, it's not a valid domain name: {}",
+                    domain, e
+                );
+                error!(logger, "{}", msg);
+                println!("{}", msg);
+                continue;
+            }
+
+            Ok(domain) => domain,
+        };
+        match db::on_sqlite_busy_retry_indefinitely(&mut || db::add_instance(&conn, &domain)) {
+            Err(e) => {
+                let msg = format!("Failed to add {} to the database: {}", domain, e);
+                error!(logger, "{}", msg);
+                println!("{}", msg);
+            }
+
+            Ok(_) => {
+                let msg = format!("Manually added {} to the database", domain);
+                info!(logger, "{}", msg);
+            }
+        }
         // This is a pretty tight loop that hammers the database, but it's low-priority. Yield to
         // other threads in the hope that they have work to do.
         std::thread::yield_now();

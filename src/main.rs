@@ -4,6 +4,7 @@ use url::Host;
 
 mod checker;
 mod db;
+mod domain;
 mod instance_adder;
 mod ipc;
 mod logging_helpers;
