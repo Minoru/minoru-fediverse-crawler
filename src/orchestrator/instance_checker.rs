@@ -112,8 +112,13 @@ fn process_checker_response(
                 println!("{} is moving to {}", target, to);
             }
             ipc::InstanceState::Moved { to } => {
-                println!("{} has moved to {}", target, to);
-                db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
+                if &to == target {
+                    println!("{} has moved to *itself*, marking as dead", target);
+                    db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
+                } else {
+                    println!("{} has moved to {}", target, to);
+                    db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
+                }
             }
         },
     }
