@@ -61,7 +61,7 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
 }
 
 async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
-    let client = HttpClient::new(host).await?;
+    let client = HttpClient::new(logger.clone(), host).await?;
 
     let software = get_software(logger, &client, host).await?;
     info!(logger, "{} runs {}", host, software);

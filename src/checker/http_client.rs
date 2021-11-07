@@ -1,6 +1,7 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use futures::future::{self, TryFutureExt};
 use reqwest::Client;
+use slog::{error, Logger};
 use std::future::Future;
 use std::time::Duration;
 use url::{Host, Url};
@@ -61,9 +62,29 @@ pub struct HttpClient {
 }
 
 impl HttpClient {
-    pub async fn new(host: &Host) -> Result<Self, HttpClientError> {
+    pub async fn new(logger: Logger, host: &Host) -> Result<Self, HttpClientError> {
+        // Our redirect policy is:
+        // - follow redirects as long as they point to the same hostname:port, and schema didn't
+        //   change
+        // - stop after 10 redirects
+        let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() > 10 {
+                error!(logger, "Too many redirects: {:?}", attempt.previous());
+                attempt.error("too many redirects")
+            } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
+                error!(
+                    logger,
+                    "Redirect points to {} which is of different origin that {}; stopping here",
+                    attempt.url(),
+                    &attempt.previous()[0]
+                );
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        });
         let inner = reqwest::ClientBuilder::new()
-            .redirect(reqwest::redirect::Policy::none())
+            .redirect(redirect_policy)
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(HttpClientError::ReqwestError)?;
@@ -155,4 +176,34 @@ fn redirect_into_error(response: &reqwest::Response) -> Result<(), HttpClientErr
         _ => {}
     }
     Ok(())
+}
+
+/// Returns `true` if the URLs have the same schema, domain, and port.
+fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
+    lhs.origin() == rhs.origin()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_origin() {
+        let http_example_com = Url::parse("http://example.com").unwrap();
+        let https_example_com = Url::parse("https://example.com").unwrap();
+        let https_foo_example_com = Url::parse("https://foo.example.com").unwrap();
+        let https_example_com_443 = Url::parse("https://example.com:443").unwrap();
+        let https_example_com_444 = Url::parse("https://example.com:444").unwrap();
+        let https_example_org = Url::parse("https://example.org").unwrap();
+
+        assert!(!is_same_origin(&http_example_com, &https_example_com));
+        assert!(!is_same_origin(&https_example_com, &http_example_com));
+        assert!(!is_same_origin(&https_example_com, &https_example_org));
+        assert!(!is_same_origin(&https_example_com, &https_example_com_444));
+        assert!(!is_same_origin(&https_example_com, &https_foo_example_com));
+        assert!(!is_same_origin(&https_foo_example_com, &https_example_com));
+
+        assert!(is_same_origin(&https_example_com, &https_example_com));
+        assert!(is_same_origin(&https_example_com, &https_example_com_443));
+    }
 }
