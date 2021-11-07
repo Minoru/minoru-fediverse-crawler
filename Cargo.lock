@@ -3,6 +3,16 @@
 version = 3
 
 [[package]]
+name = "addr"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "600754573c1accfc3c564977767e78e3c6c2b477b8bb10826ae4bfe210e01108"
+dependencies = [
+ "psl",
+ "psl-types",
+]
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -209,6 +219,7 @@ dependencies = [
 name = "fediverse-observer"
 version = "0.1.0"
 dependencies = [
+ "addr",
  "anyhow",
  "chrono",
  "fastrand",
@@ -828,6 +839,21 @@ checksum = "ba508cc11742c0dc5c1659771673afbab7a0efab23aa17e854cbab0837ed0b43"
 dependencies = [
  "unicode-xid",
 ]
+
+[[package]]
+name = "psl"
+version = "2.0.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df9db502654ba78a2862c0bf44242fce9efa467b414c21f28c3d99ca101f302d"
+dependencies = [
+ "psl-types",
+]
+
+[[package]]
+name = "psl-types"
+version = "2.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b398073e7cdd6f05934389a8f5961e3aabfa66675b6f440df4e2c793d51a4f"
 
 [[package]]
 name = "quote"
