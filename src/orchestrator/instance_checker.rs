@@ -109,7 +109,11 @@ fn process_checker_response(
                 process_peers(logger, conn, target, lines)?;
             }
             ipc::InstanceState::Moving { to } => {
-                println!("{} is moving to {}", target, to);
+                println!(
+                    "{} is moving to {}. This is a temporary redirect, so marking as dead",
+                    target, to
+                );
+                db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
             }
             ipc::InstanceState::Moved { to } => {
                 if &to == target {
