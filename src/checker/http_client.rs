@@ -9,6 +9,9 @@ use url::{Host, Url};
 /// The string to be matched against "User-agent" in robots.txt
 const USER_AGENT_TOKEN: &str = "MinoruFediverseCrawler";
 
+/// The string to be sent with each HTTP request.
+const USER_AGENT_FULL: &str = "Minoru's Fediverse Crawler";
+
 #[derive(Debug)]
 pub enum HttpClientError {
     /// The URL couldn't be accessed because the access is forbidden by robots.txt.
@@ -89,6 +92,7 @@ impl HttpClient {
         let inner = reqwest::ClientBuilder::new()
             .redirect(redirect_policy)
             .timeout(Duration::from_secs(30))
+            .user_agent(USER_AGENT_FULL)
             .build()
             .map_err(HttpClientError::ReqwestError)?;
         let robots_txt = {
