@@ -6,6 +6,9 @@ use std::future::Future;
 use std::time::Duration;
 use url::{Host, Url};
 
+/// The string to be matched against "User-agent" in robots.txt
+const USER_AGENT_TOKEN: &str = "MinoruFediverseCrawler";
+
 #[derive(Debug)]
 pub enum HttpClientError {
     /// The URL couldn't be accessed because the access is forbidden by robots.txt.
@@ -135,11 +138,9 @@ impl HttpClient {
     }
 
     fn allowed_by_robots_txt(&self, url: &str) -> bool {
-        const USER_AGENT: &str = "";
-
         use robotstxt::DefaultMatcher;
         let mut matcher = DefaultMatcher::default();
-        matcher.one_agent_allowed_by_robots(&self.robots_txt, USER_AGENT, url)
+        matcher.one_agent_allowed_by_robots(&self.robots_txt, USER_AGENT_TOKEN, url)
     }
 }
 
