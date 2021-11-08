@@ -121,8 +121,6 @@ async fn fetch_nodeinfo(
     host: &Host,
 ) -> anyhow::Result<String> {
     let pointer = fetch_nodeinfo_pointer(logger, client, host).await?;
-    // TODO: add sanitization step that removes any links that point outside of the current host's
-    // domain
     let url = pick_highest_supported_nodeinfo_version(&pointer)?;
     fetch_nodeinfo_document(logger, client, &url).await
 }
@@ -141,7 +139,6 @@ async fn fetch_nodeinfo_pointer(
         err
     })?;
 
-    // TODO: replace this with a parser that only processes the first few KB of the input
     Ok(response.json::<NodeInfoPointer>().await?)
 }
 
@@ -186,7 +183,6 @@ async fn fetch_nodeinfo_document(
         err
     })?;
 
-    // TODO: replace this with a parser that only processes the first few KB of the input
     Ok(response.text().await?)
 }
 
@@ -218,7 +214,6 @@ async fn get_peers_mastodonish(
         err
     })?;
 
-    // TODO: replace this with a parser that only processes the first megabyte of the response
     Ok(response
         .json::<Vec<String>>()
         .await?
