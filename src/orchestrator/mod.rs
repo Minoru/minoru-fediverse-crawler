@@ -53,7 +53,7 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
                 }
             });
 
-            time_to_generate_a_list = crate::time::in_about_half_an_hour()?;
+            time_to_generate_a_list = crate::time::in_about_six_hours()?;
         }
 
         let (instance, check_time) = db::pick_next_instance(&conn)

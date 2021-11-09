@@ -71,13 +71,17 @@ Suffix List][publicsuffix] are allowed.
 
 ## How often is the list updated?
 
-About every half an hour.
+About every six hours.
 
 The instances themselves are checked about once a day. The crawler also
 maintains internal lists of "moved" and "dead" instances, which are checked once
 a week (just in case any of them come back to life). The checks are spread out
 throughout the day with some jitter, that's why the list is updated more often
 than the check period.
+
+Please do not request the list very often. It doesn't make sense; only a couple
+instances appear and die every day, and you probably don't need to know about it
+*right away*. This is not a monitoring service.
 
 ## Who is responsible for this list?
 

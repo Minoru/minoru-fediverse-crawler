@@ -35,9 +35,9 @@
 //! The functions that implement those techniques are [`about_a_day_from_now()`] and
 //! [`about_a_week_from_now()`].
 //!
-//! This module also has a [`in_about_half_an_hour()`] function, which is used when generating
-//! a list of "alive" instances. That task is periodic, and uses a slightly odd period of 31
-//! minutes. Randomization adds or subtracts up to 2 minutes.
+//! This module also has a [`in_about_six_hours()`] function, which is used when generating
+//! a list of "alive" instances. That task is periodic, and uses a slightly odd period of 6 hours
+//! and 6 minutes. Randomization adds or subtracts up to 5 minutes.
 //!
 //! Finally, there is [`sometime_today()`], which is a helper we use when we schedule
 //! a check for a newly discovered instance. This is an initial check, so it's not periodic. We
@@ -88,11 +88,12 @@ pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
     now_plus_offset_plus_random_from_range(Duration::zero(), 0..=DAY_SECS)
 }
 
-/// Random datetime about 31 minutes from now.
-pub fn in_about_half_an_hour() -> anyhow::Result<DateTime<Utc>> {
-    const TWO_MINUTES_SECS: i64 = 2 * 60;
+/// Random datetime about 6.1 hours from now (now + 6 hours 6 minutes ± 5 minutes).
+pub fn in_about_six_hours() -> anyhow::Result<DateTime<Utc>> {
+    const FIVE_MINUTES_SECS: i64 = 5 * 60;
+    const SIX_HOURS_SIX_MINUTES_MINS: i64 = 6 * 60 + 6;
     now_plus_offset_plus_random_from_range(
-        Duration::minutes(31),
-        -TWO_MINUTES_SECS..=TWO_MINUTES_SECS,
+        Duration::minutes(SIX_HOURS_SIX_MINUTES_MINS),
+        -FIVE_MINUTES_SECS..=FIVE_MINUTES_SECS,
     )
 }
