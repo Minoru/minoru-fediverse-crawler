@@ -20,7 +20,7 @@ Some explicit *non*-goals are:
 - **providing a wealth of information**: uptime statistics, software make and
     version etc. There are already [sites that do
     this](https://git.feneas.org/feneas/fediverse/-/wikis/instance-monitoring-sites),
-    but they don't have spiders. the crawler should fill that niche without
+    but they don't have crawlers. This project should fill that niche without
     duplicating the work of others.
 - **horizontal scaling** (mesh or peer-to-peer architecture). This *could*
     increase reliability and availability, but it would also increase
@@ -42,7 +42,7 @@ Encrypting it to PGP key 0x356961a20c8bfd03 would be a nice touch.
 The service is connected to the world in two ways:
 
 1. anyone on the Internet can visit the service's web frontend; and
-2. the spider downloads data from Fediverse instances.
+2. the crawler downloads data from Fediverse instances.
 
 We block the first vector by making the front-end static: the service
 periodically updates static HTML, Atom and CSV files which are then served from
@@ -59,17 +59,17 @@ There are three classes of possible attacks:
 1. attacks against the network stack (e.g. exploiting bugs in the TLS
    implementation);
 2. attacks against the code that processes the responses (e.g. exhausting the
-   spider's memory using a specifically crafted JSON response);
-3. attacks against the inner workings of the spider (e.g. feeding it a seemingly
-   valid data that makes the spider send a lot of requests to a single server,
+   crawler's memory using a specifically crafted JSON response);
+3. attacks against the inner workings of the crawler (e.g. feeding it a seemingly
+   valid data that makes the crawler send a lot of requests to a single server,
    causing a denial of service)
 
 The first two are mitigated by:
 
 1. using a memory-safe language;
-2. sandboxing untrusted parts of the spider.
+2. sandboxing untrusted parts of the crawler.
 
-   The main part of the spider, let's call it "orchestrator", is trusted. Every
+   The main part of the crawler, let's call it "orchestrator", is trusted. Every
    time it wants to check some Fediverse instance, the orchestrator spawns a new
    "checker" process and the associated "network" process; both of those are
    untrusted. "Checker" can communicate data back to the orchestrator, and it
@@ -92,11 +92,11 @@ are detailed below.
 
 These are the attacks from the third class (see above).
 
-#### Attacks against the spider itself
+#### Attacks against the crawler itself
 
-This set of attacks tries to slow down, incapacitate, or mislead the spider.
+This set of attacks tries to slow down, incapacitate, or mislead the crawler.
 
-##### Feed the spider bogus data to make the front-end advertise it
+##### Feed the crawler bogus data to make the front-end advertise it
 
 The front-end lists currently alive instances. Thus, by creating a fake
 instance, an attacker could make the service advertise it. The goals could be:
@@ -109,7 +109,7 @@ Mitigations:
 1. annotate all links with `rel="nofollow"`, so they don't boost the target;
 2. **there is no mitigation for the spam problem**.
 
-##### Slowing the spider down
+##### Slowing the crawler down
 
 This could be accomplished in a variety of ways: slow responses, low transfer
 speeds, redirect loops.
@@ -137,42 +137,42 @@ Mitigations:
 3. the database should store as little information as possible, making it hard
    to exhaust disk space.
 
-##### Crashing the spider
+##### Crashing the crawler
 
 This could be accomplished by sending particularly broken responses to the
-spider.
+crawler.
 
 Mitigations:
 
-1. the part of the spider that processes the response should be a separate
+1. the part of the crawler that processes the response should be a separate
    process, which can crash without affecting the rest of the service. (It can't
    be a thread or a simple `try-catch` block since those are not fully isolated
    and could e.g. corrupt memory).
 
-#### Making the spider attack the Internet
+#### Making the crawler attack the Internet
 
-This set of attacks uses the spider to cause or amplify attacks against hosts on
+This set of attacks uses the crawler to cause or amplify attacks against hosts on
 the Internet.
 
-##### Pointing the spider at a host to harass it
+##### Pointing the crawler at a host to harass it
 
-The spider will visit any host it is told about; the attacker could use it as
+The crawler will visit any host it is told about; the attacker could use it as
 a help in a DoS attack.
 
 Mitigations:
 
-1. make checks so rarely that the spider is useless as part of a DoS attack.
-   Unfortunately, this puts a limit on how often the spider can check instances;
+1. make checks so rarely that the crawler is useless as part of a DoS attack.
+   Unfortunately, this puts a limit on how often the crawler can check instances;
    e.g. at 1 check per second it would take almost 12 days to crawl 1 million
    instances. I still think it'd be worth it, since the Fediverse is likely to
    expand slower as it gets larger;
 2. if a host doesn't identify as a Fediverse instance for a while, declare it
    "dead" and re-check it way less often.
 
-##### Redirecting the spider to a victim host
+##### Redirecting the crawler to a victim host
 
 The previous attack can still be mounted if an attacker could somehow
-concentrate the spider's requests at the victim host. There are two conceivable
+concentrate the crawler's requests at the victim host. There are two conceivable
 ways to do that: make a lot of DNS CNAMEs, or set up hosts that serve HTTP
 redirects to the victim.
 
