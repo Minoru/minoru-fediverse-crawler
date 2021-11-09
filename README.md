@@ -3,8 +3,8 @@
 This program goes between [Fediverse][wikipedia-fediverse] servers, fetches
 their peers lists, and compiles a summary list of alive known instances.
 
-See [ARCHITECTURE.md][] for a detailed explanation of what I'm trying to build
-here.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed explanation of what I'm
+trying to build here.
 
 ## License
 
