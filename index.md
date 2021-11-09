@@ -43,6 +43,10 @@ the instance and add it to the list.
 
 Make sure the instance didn't opt out of statistics as described above.
 
+If you did that, and after a week the instance still isn't on the list, please
+<a href="https://github.com/Minoru/minoru-fediverse-crawler/issues/new">file an
+issue</a>.
+
 ## What exactly does the list contain?
 
 It's a JSON array of hostnames of all alive instances that are known to the
