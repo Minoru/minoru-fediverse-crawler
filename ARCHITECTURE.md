@@ -2,9 +2,8 @@
 
 ## The purpose of this project
 
-minoru-fediverse-crawler goes around the Fediverse, finds recently created
-instances, and reports them via a webpage and an Atom feed. It also provides
-a plain text list of all currently known running instances.
+minoru-fediverse-crawler goes between Fediverse servers, fetches their peers
+lists, and compiles a summary list of alive known instances.
 
 ## The goals of the architecture
 
@@ -45,9 +44,9 @@ The service is connected to the world in two ways:
 2. the crawler downloads data from Fediverse instances.
 
 We block the first vector by making the front-end static: the service
-periodically updates static HTML, Atom and CSV files which are then served from
-the filesystem by Nginx. (We still have to secure Nginx, but that's a better-known
-problem than securing a custom frontend.)
+periodically updates a static JSON file which is then served from the filesystem
+by Nginx. (We still have to secure Nginx, but that's a better-known problem than
+securing a custom frontend.)
 
 The second vector still allows for a number of attacks, which are described
 below.
@@ -60,37 +59,32 @@ There are three classes of possible attacks:
    implementation);
 2. attacks against the code that processes the responses (e.g. exhausting the
    crawler's memory using a specifically crafted JSON response);
-3. attacks against the inner workings of the crawler (e.g. feeding it a seemingly
+3. attacks against the inner workings of the crawler (e.g. feeding it seemingly
    valid data that makes the crawler send a lot of requests to a single server,
-   causing a denial of service)
+   causing a denial of service of that server).
 
-The first two are mitigated by:
+The first two are mostly mitigated by:
 
 1. using a memory-safe language;
 2. sandboxing untrusted parts of the crawler.
 
-   The main part of the crawler, let's call it "orchestrator", is trusted. Every
-   time it wants to check some Fediverse instance, the orchestrator spawns a new
-   "checker" process and the associated "network" process; both of those are
-   untrusted. "Checker" can communicate data back to the orchestrator, and it
-   also has two-way communications with its associated "network" process. Each
-   receiver validates what it gets.
+   The main part of the crawler, let's call it Orchestrator, is trusted. Every
+   time it wants to check some Fediverse instance, the Orchestrator spawns a new
+   Checker process. Checker can communicate data back to the Orchestrator via
+   a Unix pipe connected to its stdout.
 
-   The "checker" and the "network" processes are untrusted and thus sandboxed.
-   The "checker" only has access to CPU and memory; the "network" process has
-   access to CPU, memory, and network.
+   Checkers are untrusted, and only have access to CPU, memory, and network —
+   they can't write into the database directly.
 
-   Thus, compromising any one process gives an attacker a small foothold, and
-   from there they have to fight the validators through the narrow pipe of IPC.
-   Attacks like memory exhaustion also have limited effect because they likely 
-   crash just that one process.
+   Thus, compromising a Checker gives an attacker only a small foothold, and
+   from there they have to fight through the narrow pipe of IPC. Attacks like
+   memory exhaustion also have limited effect because they likely crash just
+   that one process.
 
-The last attack class is mitigated through smaller, more focused measures which
-are detailed below.
+The rest of the mitigations are smaller, more focused measures; they are
+detailed below.
 
 ### Specific attacks
-
-These are the attacks from the third class (see above).
 
 #### Attacks against the crawler itself
 
@@ -99,20 +93,19 @@ This set of attacks tries to slow down, incapacitate, or mislead the crawler.
 ##### Feed the crawler bogus data to make the front-end advertise it
 
 The front-end lists currently alive instances. Thus, by creating a fake
-instance, an attacker could make the service advertise it. The goals could be:
+instance, an attacker could make the service advertise it. The only goal we can
+think of is spam.
 
-1. black SEO: a link from the service boosts the search rating of the target
-2. spam: filling the service with bogus data
-
-Mitigations:
-
-1. annotate all links with `rel="nofollow"`, so they don't boost the target;
-2. **there is no mitigation for the spam problem**.
+**There is no mitigation** at the moment, but there are ideas. One we have
+stolen from fediverse.space is to group instances by the registrable part of the
+domain ("example.com" in "foo.example.com"), and require manual moderation of
+large groups. See https://github.com/Minoru/minoru-fediverse-crawler/issues/19
+for details and discussion.
 
 ##### Slowing the crawler down
 
-This could be accomplished in a variety of ways: slow responses, low transfer
-speeds, redirect loops.
+This could be accomplished in a variety of ways: large responses, slow
+responses, low transfer speeds, redirect loops.
 
 Mitigations:
 
@@ -176,142 +169,84 @@ concentrate the crawler's requests at the victim host. There are two conceivable
 ways to do that: make a lot of DNS CNAMEs, or set up hosts that serve HTTP
 redirects to the victim.
 
-Thus, we follow redirects as long as they point to the same host, and stop when
-we encounter a new hostname.
+Thus, we follow redirects only as long as they point to the exact same origin
+(schema, domain, port triple).
 
 Mitigations:
 
 1. compare URLs from the NodeInfo with the hostname by which the NodeInfo was
-   fetched. If they don't match, consider this host "dead". This means further
-   checks will be made less often, making the DNS CNAMEs useless;
-2. when encountering HTTP 302 Moved Permanently (which points to a new
-   hostname), add the target to the list of known instances, and check the old
-   hostname as "dead";
-3. when encountering HTTP 302 Found (which points to a new hostname), stop and
-   re-schedule the check. Either the redirect will disappear after a while, or
-   the server will move for good and the service will re-discover it.
+   fetched. If they don't match, consider this host "dead". Thus we never touch
+   the "victim" host, and no attack is possible with DNS CNAMEs;
+2. when encountering a temporary redirect, don't follow it, and mark the checked
+   instance as "dead". If the instance isn't malicious, we'll learn about its
+   new hostname soon enough from some other server. If it's malicious, we just
+   stopped an attack;
+3. when encountering a permanent redirect, add the target to the database, and
+   mark the checked instance as "moved". This lets us "coalesce" multiple
+   redirects into one (because the database only stores each instance once).
 
 ## Architecture
 
-The service is a single executable. All the data is stored in SQLite or sled
-(haven't decided yet). These choices make it easy to deploy and maintain the
-service.
+The service is a single executable. All the data is stored in SQLite. These
+choices make it easy to deploy and maintain the service.
 
 The code is written in Rust. It's what I know fairly well, and is a good fit for
 a backend service like this.
 
-The main process is called an "orchestrator". It looks through the list of known
-Fediverse instances, finds the ones that are due to get checked, and starts
-processes for each check. From time to time it also generates a dump of all
-known alive instances, which is then served by Nginx to the general public.
+The main process is called an Orchestrator. It looks through the list of known
+Fediverse instances, finds the ones that are due to get checked, and spawns OS
+threads that start Checker processes for each check. It also immediately
+reschedules these checks for later. From time to time it also generates a dump
+of all known alive instances, which is then served by Nginx to the general
+public.
 
-Each check is performed by a separate "checker" process. It communicates with
-the "orchestrator" via a Unix pipe. This process acts as a sandbox, enhancing
+Each check is performed by a separate Checker process. It communicates with the
+Orchestrator via a Unix pipe. This process acts as a sandbox, enhancing
 security. (Once we got an MVP, it's our intent to strengthen the sandbox with
 chroot, namespaces, and seccomp.)
 
-First of all, the "checker" process fetches NodeInfo of the instance. If that
-succeeds, and the response is a valid NodeInfo document, the instance is
-considered to be alive (which is immediately reported back to the
-"orchestrator").
+First of all, the Checker process fetches robots.txt against which all other
+requests will be checked.
 
-After that, the "checker" looks at the `software.name` field of the NodeInfo and
-picks an appropriate API endpoint to request the list of peers; if the software
-name is unknown, Mastodon's endpoint (api/v1/instance/peers) is used, as it is
-the most common. The response is parsed and is reported to the "orchestrator".
+Next, it fetches NodeInfo of the instance. If that succeeds, and the response is
+a valid NodeInfo document, the instance is considered to be alive (which is
+immediately reported back to the Orchestrator).
 
-Upon spawning a "checker" process, the "orchestrator" starts a one-minute timer.
-If the timer fires before the process has finished, the process is forcibly
-killed.
+Then, the checker looks at the `software.name` field of the NodeInfo and can
+make an additional request to check if an instance is "private", i.e. if it
+opted out of statistics. Only GNU Social, Hubzilla and Friendica support this at
+the moment.
 
-When a "checker" process reports that an instance is alive, the "orchestrator"
-picks the datetime of the next check and records it in the database. When
-a "checker" process starts reporting peer instances, the "orchestrator" checks
-if they are already in the database, and if they aren't, adds them along with
-a random datetime of the next check.
+After that, the Checker picks an appropriate API endpoint to request the list of
+peers; if the software name is unknown, no further requests are made. The
+response is parsed and the list of peers is reported to the Orchestrator.
+
+A thread that the Orchestrator starts for each check is responsible for reading
+Checker's responses and storing them in the database. If the Checker never
+writes anything before terminating, the instance is considered dead. If the
+Checker says that the instance is moving (temporary redirect), then it's marked
+dead; if it has moved (permanent redirect), then it is marked as moved. As new
+instances are found in the peer list, they're assigned a random time to get
+checked in the near future.
 
 ## Discussion of the architecture
 
 ### Performance considerations
 
-It's bad that the "orchestrator" is the one who checks if the instance is
-already in the database. New instances appear quite rarely, so most of the time,
-lists of peers will contain nothing new. At the same time, the lists will only
-grow over time as Fediverse itself grows. As a result, the "orchestrator" will
-find itself processing vast amounts of data for little gain.
-Back-of-the-envelope math: 1 million (1e6) instances, each talking to half the
-Fediverse (5e5 instances), means there are 5e11 entries in all lists combined;
-spread over one day, this is 5e11/24/60/60 = 5.8e6 entries per second to
-process.
+All checks would require at least a single write: the Orchestrator has to update
+the next check's datetime. "Moving" and "dying" instances will cause an
+additional write to update the count of redirects and failed checks. If a new
+peer is found in someone's peer list, that would cause yet another write.
 
-Due to security considerations, we can't give the "checker" process access to
-the database. Instead, we could give it a list of known instances, so each
-process only report new ones. Details are lacking at this point; the important
-bit is that this architecture *can* be scaled to 1e6 instances.
+Thus, the database is at the center of everything, and SQLite only supports one
+writer at a time. We might have to work on our SQL queries to reduce the number
+of writes, but we believe that the problem is not dire enough to switch to
+another database.
 
-## Various notes
+# Async Rust vs. OS threads
 
-Could use this for http mocking and testing: https://github.com/alexliesenfeld/httpmock
-
-This video an async-await might come in handy for "orchestrator": https://fosstodon.org/@jonhoo/106871799020652794
-
-How to make this reliable enough for production: https://pythonspeed.com/fil/docs/fil4prod/reliable.html
-
-Peer lists in different Fedi software:
-- mastodon, pleroma, misskey, bookwyrm, smithereen: api/v1/instance/peers
-- peertube: server/following https://docs.joinpeertube.org/api-rest-reference.html#tag/Instance-Follows/paths/~1server~1followers~1{nameWithHost}~1accept/post
-
-### Sandboxing
-
-https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/design/sandbox.md
-https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/linux/sandboxing.md
-https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/linux/suid_sandbox.md
-https://www.usenix.org/conference/enigma2021/presentation/palmer
-https://chromium.googlesource.com/chromium/src/+/refs/heads/main/docs/design/sandbox_faq.md
-https://wiki.mozilla.org/Security/Sandbox
-https://wiki.mozilla.org/Security/Sandbox/Specifics#Linux
-https://lwn.net/Articles/531114/
-https://github.com/kristapsdz/acme-client-portable/blob/master/Linux-seccomp.md
-
-## Tentative SQL schema
-
-instances
-- id integer unique not null primary key
-- hostname string unique not null
-- state referrences states(id) not null
-
-states
-- id integer unique not null primary key
-- state text not null
-(This table contains: "discovered", "live", "dying", "dead", "reviving",
-"moving", "moved")
-
-state_live
-- id integer unique not null primary key
-- live_since datetime not null
-
-state_dying
-- id integer unique not null primary key
-- dying_since datetime not null
-
-state_dead
-- id integer unique not null primary key
-- dead_since datetime not null
-
-state_reviving
-- id integer unique not null primary key
-- reviving_since datetime not null
-
-state_moving
-- id integer unique not null primary key
-- moving_since datetime not null
-- moving_to referencing instances(id)
-
-state_moved
-- id integer unique not null primary key
-- moved_at datetime not null
-- moved_to referencing instances(id)
-
-schedule
-- instance referencing instances(id)
-- next_check_after datetime not null
+We use async Rust in Checkers because that's the easy way to integrate with the
+reqwest crate. We do not use async in the Orchestrator because all its
+operations have to talk to the database, and SQLite operations are blocking;
+we'd have to spawn separate OS threads for them anyway, and there is no point
+hiding this behind async.
