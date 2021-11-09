@@ -2,9 +2,9 @@
 
 ## The purpose of this project
 
-fediverse.observer goes around the Fediverse, finds recently created instances,
-and reports them via a webpage and an Atom feed. It also provides a plain text
-list of all currently known running instances.
+minoru-fediverse-crawler goes around the Fediverse, finds recently created
+instances, and reports them via a webpage and an Atom feed. It also provides
+a plain text list of all currently known running instances.
 
 ## The goals of the architecture
 
@@ -20,12 +20,12 @@ Some explicit *non*-goals are:
 - **providing a wealth of information**: uptime statistics, software make and
     version etc. There are already [sites that do
     this](https://git.feneas.org/feneas/fediverse/-/wikis/instance-monitoring-sites),
-    but they don't have spiders. Fediverse.observer should fill that niche
-    without duplicating the work of others.
+    but they don't have spiders. the crawler should fill that niche without
+    duplicating the work of others.
 - **horizontal scaling** (mesh or peer-to-peer architecture). This *could*
     increase reliability and availability, but it would also increase
     complexity. Even though Fediverse instances show up and disappear every day,
-    it doesn't happen so fast that Fediverse.observer needs five-nines SLA, and
+    it doesn't happen so fast that the crawler needs five-nines SLA, and
     neither do its users. I believe that one million nodes can be crawled using
     a single server, so I don't think horizontal scaling is necessary here.
 - **portability**: there is only going to be a single instance of this service,

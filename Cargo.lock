@@ -216,32 +216,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fediverse-observer"
-version = "0.1.0"
-dependencies = [
- "addr",
- "anyhow",
- "chrono",
- "fastrand",
- "futures",
- "json",
- "lexopt",
- "libsqlite3-sys",
- "reqwest",
- "robotstxt",
- "rusqlite",
- "rusty_pool",
- "serde",
- "serde_json",
- "signal-hook",
- "slog",
- "slog-journald",
- "tempfile",
- "tokio",
- "url",
-]
-
-[[package]]
 name = "flate2"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -645,6 +619,32 @@ checksum = "a92518e98c078586bc6c934028adcca4c92a53d6a958196de835170a01d84e4b"
 dependencies = [
  "adler",
  "autocfg",
+]
+
+[[package]]
+name = "minoru-fediverse-crawler"
+version = "0.1.0"
+dependencies = [
+ "addr",
+ "anyhow",
+ "chrono",
+ "fastrand",
+ "futures",
+ "json",
+ "lexopt",
+ "libsqlite3-sys",
+ "reqwest",
+ "robotstxt",
+ "rusqlite",
+ "rusty_pool",
+ "serde",
+ "serde_json",
+ "signal-hook",
+ "slog",
+ "slog-journald",
+ "tempfile",
+ "tokio",
+ "url",
 ]
 
 [[package]]

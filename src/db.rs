@@ -118,7 +118,7 @@ impl FromSql for InstanceState {
 
 /// Connect to the database.
 pub fn open() -> anyhow::Result<Connection> {
-    let conn = Connection::open("fediverse.observer.db")
+    let conn = Connection::open("minoru-fediverse-crawler.db")
         .context(with_loc!("Failed to initialize the database"))?;
     conn.pragma_update(None, "journal_mode", "WAL")
         .context(with_loc!("Switching to WAL mode"))?;

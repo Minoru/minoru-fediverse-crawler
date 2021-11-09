@@ -1,6 +1,6 @@
 /target
-/fediverse.observer.db
-/fediverse.observer.db-journal
-/fediverse.observer.db-shm
-/fediverse.observer.db-wal
+/minoru-fediverse-crawler.db
+/minoru-fediverse-crawler.db-journal
+/minoru-fediverse-crawler.db-shm
+/minoru-fediverse-crawler.db-wal
 /instances.json
