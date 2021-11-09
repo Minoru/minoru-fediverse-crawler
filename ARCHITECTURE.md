@@ -243,7 +243,7 @@ writer at a time. We might have to work on our SQL queries to reduce the number
 of writes, but we believe that the problem is not dire enough to switch to
 another database.
 
-# Async Rust vs. OS threads
+### Async Rust vs. OS threads
 
 We use async Rust in Checkers because that's the easy way to integrate with the
 reqwest crate. We do not use async in the Orchestrator because all its
