@@ -15,7 +15,7 @@ here:
 <a href="./instances.json">instances.json</a>
 </center>
 
-<div style="height: 4rem;"></div>
+<h1>&nbsp;<!-- spacer --></h1>
 
 [wikipedia-fediverse]: https://en.wikipedia.org/wiki/Fediverse "Fediverse — Wikipedia"
 
