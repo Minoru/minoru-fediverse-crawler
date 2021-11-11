@@ -1,0 +1,15 @@
+[Unit]
+Description=Minoru's Fediverse crawler
+After=network.target
+
+[Service]
+Type=simple
+User=fedicrawler
+WorkingDirectory=/home/fedicrawler
+ExecStart=/home/fedicrawler/minoru-fediverse-crawler
+Restart=always
+# The service should normally finish within three seconds, so 5 is plenty.
+TimeoutSec=5
+
+[Install]
+WantedBy=multi-user.target
