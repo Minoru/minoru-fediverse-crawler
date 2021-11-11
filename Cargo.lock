@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "minoru-fediverse-crawler"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "addr",
  "anyhow",
