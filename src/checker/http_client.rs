@@ -10,7 +10,8 @@ use url::{Host, Url};
 const USER_AGENT_TOKEN: &str = "MinoruFediverseCrawler";
 
 /// The string to be sent with each HTTP request.
-const USER_AGENT_FULL: &str = "Minoru's Fediverse Crawler";
+const USER_AGENT_FULL: &str =
+    "Minoru's Fediverse Crawler (+https://fediverse-instances.debiania.in.ua)";
 
 #[derive(Debug)]
 pub enum HttpClientError {

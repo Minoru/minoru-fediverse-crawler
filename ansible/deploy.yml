@@ -1,0 +1,56 @@
+---
+- hosts: production
+  become: yes
+
+  tasks:
+  - name: Deploy index.html.
+    copy:
+      src: ../index.html
+      dest: /home/fedicrawler/www/
+      owner: fedicrawler
+      group: fedicrawler
+      mode: "u=rw,go=r"
+
+  - name: Ensure there is a symlink from www/instances.json to the real thing.
+    file:
+      src: /home/fedicrawler/instances.json
+      dest: /home/fedicrawler/www/instances.json
+      state: link
+      # Create it even if the target file doens't exist.
+      force: yes
+
+  - name: Check if systemd service already exists.
+    stat:
+      path: /etc/systemd/system/minoru-fediverse-crawler.service
+    register: systemd_service
+
+  - name: Stop systemd service.
+    become: yes
+    when: systemd_service.stat.exists
+    service:
+      name: minoru-fediverse-crawler
+      state: stopped
+
+  - name: Ensure systemd service file exists.
+    become: yes
+    copy:
+      src: minoru-fediverse-crawler.service
+      dest: /etc/systemd/system/
+      mode: "u=rw,go=r"
+
+  - name: Deploy the crawler.
+    copy:
+      src: ../target/release/minoru-fediverse-crawler
+      dest: /home/fedicrawler/
+      owner: fedicrawler
+      group: fedicrawler
+      # Security precaution: the user can't overwrite the binary.
+      mode: "u=rx,go="
+
+  - name: Start systemd service.
+    become: yes
+    service:
+      daemon_reload: yes
+      name: minoru-fediverse-crawler
+      state: started
+      enabled: yes

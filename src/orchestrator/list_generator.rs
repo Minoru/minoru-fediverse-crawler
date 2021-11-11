@@ -54,6 +54,20 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
         .context(with_loc!("Creating a temporary file in current directory"))?;
     file.write_all(instances.as_bytes())
         .context(with_loc!("Writing instances into a temporary file"))?;
+
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = file
+            .as_file()
+            .metadata()
+            .context(with_loc!("Getting metadata of the temporary file"))?
+            .permissions();
+        perms.set_mode(0o644);
+        file.as_file()
+            .set_permissions(perms)
+            .context(with_loc!("Setting permissions for the temporary file"))?;
+    }
+
     file.persist("instances.json")
         .context(with_loc!("Renaming temporary file to 'instances.json'"))?;
 

@@ -19,7 +19,7 @@ const CONSTANT_WORKERS: usize = 1;
 // per second. Let's round that up to the nearest power of two, just because.
 const MAX_WORKERS: usize = 128;
 /// How long a worker will wait for work before shutting down its thread.
-const MAX_WORKER_IDLE_TIME: std::time::Duration = std::time::Duration::from_secs(30);
+const MAX_WORKER_IDLE_TIME: std::time::Duration = std::time::Duration::from_secs(3);
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {
     let mut conn = db::open()?;
@@ -32,6 +32,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     let terminate = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, terminate.clone())
         .context(with_loc!("Setting up a SIGINT hook"))?;
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, terminate.clone())
+        .context(with_loc!("Setting up a SIGHUP hook"))?;
 
     let mut time_to_generate_a_list = chrono::offset::Utc::now();
 
@@ -59,8 +61,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         let (instance, check_time) = db::pick_next_instance(&conn)
             .context(with_loc!("Orchestrator picking next instance"))?;
         let wait = check_time - chrono::offset::Utc::now();
-        if wait > chrono::Duration::seconds(30) {
-            std::thread::sleep(std::time::Duration::from_secs(30));
+        if wait > chrono::Duration::seconds(3) {
+            std::thread::sleep(std::time::Duration::from_secs(3));
             return Ok(());
         }
         if wait > chrono::Duration::zero() {
