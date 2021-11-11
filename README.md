@@ -1,7 +1,9 @@
 # Minoru's Fediverse crawler
 
 This program goes between [Fediverse][wikipedia-fediverse] servers, fetches
-their peers lists, and compiles a summary list of alive known instances.
+their peers lists, and compiles a summary list of alive known instances. The
+result is available at
+[fediverse-instances.debiania.in.ua](https://fediverse-instances.debiania.in.ua).
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for a detailed explanation of what I'm
 trying to build here.
