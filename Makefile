@@ -3,7 +3,10 @@ all: index.html
 index.html: index.md index.css
 	pandoc --to html5 --output index.html --css index.css --standalone index.md
 
+deploy: index.html
+	ansible-playbook --ask-become-pass ansible/deploy.yml
+
 clean:
 	rm -f index.html
 
-.PHONY: clean
+.PHONY: deploy clean

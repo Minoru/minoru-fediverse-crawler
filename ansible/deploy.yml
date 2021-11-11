@@ -1,0 +1,12 @@
+---
+- hosts: production
+  become: yes
+
+  tasks:
+  - name: Deploy index.html.
+    copy:
+      src: ../index.html
+      dest: /home/fedicrawler/www/
+      owner: fedicrawler
+      group: fedicrawler
+      mode: "u=rw,go=r"
