@@ -231,6 +231,52 @@ dead; if it has moved (permanent redirect), then it is marked as moved. As new
 instances are found in the peer list, they're assigned a random time to get
 checked in the near future.
 
+### Instance states
+
+<img
+    src="instance_states.svg"
+    alt="A diagram showing all possible states an instance can be in, and transitions between them" />
+
+When an instance is first added to the database, it is in the "discovered"
+state. The only things we know about a "discovered" instance is its hostname and
+the next check time.
+
+Once a check is done, a "discovered" instance can go into one of three states:
+"alive", "moving", or "dying". Specifically:
+
+* if the instance responded with a valid NodeInfo document, then it's considered
+    to be "alive";
+* if it responded with a permanent redirect to some other host, then it is
+    considered to be "moving";
+* if it responded with a temporary redirect, or a permanent redirect to its own
+    host, or didn't respond at all, then it is considered to be "dying".
+
+The same conditions apply when transitioning between other states; pay attention
+to the colour and line types of each transition.
+
+An instance could jump straight into the "alive" state, from any other state,
+simply by returning valid NodeInfo once.
+
+Note that "alive" state is coloured and shaded differently from "moving" and
+"dying". This is to signify that the "alive" state is "stable": as long as the
+instance responds with a valid NodeInfo document, it will stay in the "alive"
+state. "Moving" and "dying" states are different though, they're "transient": an
+instance will stay in them for a while, and if it keeps redirecting/failing, it
+will move on to the next corresponding state ("moving" will become "moved",
+"dying" will become "dead"). "Moved" and "dead" are "stable" states just like
+"alive".
+
+Of course, an instance could start "dying" while it's "moving", and a "dying"
+instance could re-appear and start redirecting, i.e. become a "moving" one.
+Similarly, a "moved" instance could start "dying", and a "dead" instance could
+re-appear and start "moving".
+
+Finally, notice a transition from "moved" to "moving". This can happen if an
+instance A "moved" to instance B, but then started redirecting to instance C. In
+that case, it will become "moving" again, only it's time it's moving to C.
+
+All of these rules are implemented in _src/db.rs_.
+
 ### Scheduling
 
 We do not want to create much load on the Fediverse, but *some* load is
@@ -241,7 +287,7 @@ To that end, we're using odd periods that don't correlate with common ones (e.g.
 spider's "day" is 29 hours rather than 24), and we also add some jitter to make
 sure we perform checks at *slightly* different times every "day".
 
-More info in src/time.rs.
+All of that is implemented  _src/time.rs_.
 
 ## Discussion of the architecture
 

@@ -1,4 +1,4 @@
-all: index.html target/release/minoru-fediverse-crawler
+all: index.html target/release/minoru-fediverse-crawler instance_states.svg
 
 index.html: index.md index.css
 	pandoc --to html5 --output index.html --include-in-header index.css --standalone index.md
@@ -10,6 +10,9 @@ target/release/minoru-fediverse-crawler: FORCE
 
 deploy: index.html ansible/minoru-fediverse-crawler.service target/release/minoru-fediverse-crawler
 	ansible-playbook --ask-become-pass ansible/deploy.yml
+
+instance_states.svg: instance_states.odg
+	libreoffice --headless --convert-to svg:draw_svg_Export $<
 
 clean:
 	rm -f index.html
