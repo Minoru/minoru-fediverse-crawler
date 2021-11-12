@@ -193,6 +193,8 @@ choices make it easy to deploy and maintain the service.
 The code is written in Rust. It's what I know fairly well, and is a good fit for
 a backend service like this.
 
+### Structure
+
 The main process is called an Orchestrator. It looks through the list of known
 Fediverse instances, finds the ones that are due to get checked, and spawns OS
 threads that start Checker processes for each check. It also immediately
@@ -228,6 +230,18 @@ Checker says that the instance is moving (temporary redirect), then it's marked
 dead; if it has moved (permanent redirect), then it is marked as moved. As new
 instances are found in the peer list, they're assigned a random time to get
 checked in the near future.
+
+### Scheduling
+
+We do not want to create much load on the Fediverse, but *some* load is
+unavoidable. We certainly don't want to create any load spikes, so we should
+perform checks at random times.
+
+To that end, we're using odd periods that don't correlate with common ones (e.g.
+spider's "day" is 29 hours rather than 24), and we also add some jitter to make
+sure we perform checks at *slightly* different times every "day".
+
+More info in src/time.rs.
 
 ## Discussion of the architecture
 
