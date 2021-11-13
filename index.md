@@ -2,22 +2,33 @@
 pagetitle: Fediverse instances list
 ---
 
-<center>
-<h1>Fediverse instances list</h1>
-</center>
+<h1>&nbsp;<!-- spacer --></h1>
 
-[Fediverse][wikipedia-fediverse] has thousands of servers. It's hard to get an
-accurate measure of how many there are, and how many people are using them. To
-help with that, we compile a list of all known alive instances, and publish it
-here:
-
-<center>
-<a href="./instances.json">instances.json</a>
-</center>
+<p style="text-align: center;">
+👉 <a href="./instances.json">instances.json</a> 👈
+</p>
 
 <h1>&nbsp;<!-- spacer --></h1>
 
-[wikipedia-fediverse]: https://en.wikipedia.org/wiki/Fediverse "Fediverse — Wikipedia"
+## Why does this exist?
+
+To **help keep track of Fediverse's growth** (or stagnation T_T).
+
+[The-federation.info][the-federation], [FediDB.org][fedidb],
+[Fediverse.Observer][fediverse.observer] and other public hubs provide some
+numbers, but they don't automatically discover new servers. As known instances
+slowly disappear, these hubs can give an impression that Fediverse is shrinking.
+This crawler discovers new instances so hubs don't have to.
+
+[the-federation]: https://the-federation.info "the federation — a statistics hub"
+[fedidb]: https://fedidb.org "FediDB — Developer Tools for ActivityPub"
+[fediverse.observer]: https://fediverse.observer "Fediverse Observer"
+
+Another *raison d'être* is to **enable novel applications** that need such
+a list. We don't know what they are just yet. A service that recommends
+instances to newcomers? Some sort of a cataloguing effort? Global search? We
+want you to go straight to building *that*, without spending your energy on
+re-inventing the "Fediverse crawler" wheel.
 
 ## How to remove an instance from this list?
 
@@ -29,7 +40,7 @@ property to `1` or `true` in the StatusNet config.
 If you're running **Hubzilla**: set `hide_in_statistics` property to `1` or
 `true` in `siteinfo.json`.
 
-If you're running anything else: add the following to your `robots.txt`:
+If you're running **anything else**: add the following to your `robots.txt`:
 
 ```
 User-agent: MinoruFediverseCrawler
@@ -38,8 +49,8 @@ Disallow: /
 
 ## How to add an instance to this list?
 
-Simply follow someone on the Fediverse :) Soon enough, the crawler will discover
-the instance and add it to the list.
+Simply follow someone on Fediverse ツ Soon enough, the crawler will discover the
+instance and add it to the list.
 
 Make sure the instance didn't opt out of statistics as described above.
 
@@ -89,12 +100,21 @@ instances appear and die every day, and you probably don't need to know about it
 
 ## Who is responsible for this list?
 
-Alexander Batischev AKA Minoru, whom you can reach on Fediverse at <a href="https://functional.cafe/@minoru">@minoru@functional.cafe</a> or by email at <a href="mailto:eual.jp@gmail.com">eual.jp@gmail.com</a>. My PGP key is 0x356961a20c8bfd03.
+Alexander Batischev AKA Minoru, whom you can reach on Fediverse at
+[\@minoru@functional.cafe][minoru] or by email at <a
+href="mailto:eual.jp@gmail.com">eual.jp@gmail.com</a>. My PGP key is
+0x356961a20c8bfd03.
+
+Kudos to [\@lightone@mastodon.xyz][lightone] for all the discussions and all the
+ideas she brought to this project!
+
+[minoru]: https://functional.cafe/@minoru "Minoru (@minoru@functional.cafe)"
+[lightone]: https://mastodon.xyz/@lightone "lostinlight (@lightone@mastodon.xyz)"
 
 ## Where is the code?
 
 See
 [github.com/Minoru/minoru-fediverse-crawler](https://github.com/Minoru/minoru-fediverse-crawler).
-I'll gladly move to a self-hosted Gitea instance once ForgeFed becomes a reality :)
+I'll gladly move to a self-hosted Gitea instance once ForgeFed becomes a reality ^_^
 
 The code is licensed under AGPL 3.0+.
