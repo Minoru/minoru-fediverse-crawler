@@ -1,0 +1,15 @@
+name: "Formatting"
+
+on: [ push, pull_request ]
+
+jobs:
+  build_and_test:
+    name: "cargo fmt"
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
+
+      - name: "cargo fmt"
+        run: cargo fmt && git diff --exit-code
