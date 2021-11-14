@@ -1,0 +1,29 @@
+name: "Build and test"
+
+on: [ push, pull_request ]
+
+jobs:
+  build_and_test:
+    name: "Build and test"
+    runs-on: ubuntu-18.04
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v2
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+
+      - name: "cargo check"
+        run: cargo check
+
+      - name: "cargo build"
+        run: cargo build
+
+      - name: "cargo test"
+        run: cargo test
