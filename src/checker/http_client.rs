@@ -75,15 +75,20 @@ impl HttpClient {
         //   change
         // - stop after 10 redirects
         let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
+            // This can't panic because in order to get redirected, we had to request some URL. So
+            // there's at least one previously-visited URL in the array.
+            #[allow(clippy::indexing_slicing)]
+            let previous: &Url = &attempt.previous()[0];
+
             if attempt.previous().len() > 10 {
                 error!(logger, "Too many redirects: {:?}", attempt.previous());
                 attempt.error("too many redirects")
-            } else if !is_same_origin(attempt.url(), &attempt.previous()[0]) {
+            } else if !is_same_origin(attempt.url(), previous) {
                 error!(
                     logger,
                     "Redirect points to {} which is of different origin that {}; stopping here",
                     attempt.url(),
-                    &attempt.previous()[0]
+                    previous
                 );
                 attempt.stop()
             } else {

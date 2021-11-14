@@ -145,7 +145,7 @@ fn process_peers(
     target: &Domain,
     lines: impl Iterator<Item = std::io::Result<String>>,
 ) -> anyhow::Result<()> {
-    let mut peers_count = 0;
+    let mut peers_count: Option<u64> = Some(0);
     for response in lines {
         let response =
             response.context(with_loc!("Failed to read a line of checker's response"))?;
@@ -163,13 +163,16 @@ fn process_peers(
                 }) {
                     info!(logger, "Failed to add {} to the database: {:?}", peer, e);
                 } else {
-                    peers_count += 1;
+                    peers_count = peers_count.and_then(|x| x.checked_add(1));
                 }
             }
         }
     }
 
-    println!("{} has {} peers", target, peers_count);
+    match peers_count {
+        None => println!("{} has more than {} peers", target, u64::MAX),
+        Some(count) => println!("{} has {} peers", target, count),
+    }
 
     Ok(())
 }

@@ -1,3 +1,14 @@
+#![deny(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::ok_expect,
+    clippy::integer_division,
+    clippy::indexing_slicing,
+    clippy::integer_arithmetic,
+    clippy::panic,
+    clippy::match_on_vec_items
+)]
+
 use anyhow::{anyhow, bail};
 use slog::{error, o, Drain, Logger};
 use url::Host;

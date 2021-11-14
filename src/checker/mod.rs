@@ -93,7 +93,11 @@ async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
 async fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyhow::Result<String> {
     let nodeinfo = fetch_nodeinfo(logger, client, host).await?;
     json::parse(&nodeinfo)
-        .map(|obj| obj["software"]["name"].to_string())
+        .map(|obj| {
+            // Indexing into JsonValue doesn't panic
+            #[allow(clippy::indexing_slicing)]
+            obj["software"]["name"].to_string()
+        })
         .map_err(|err| {
             let msg = format!(
                 "Failed to figure out the software name from the NodeInfo {}: {}",
@@ -234,7 +238,11 @@ async fn is_instance_private(
                 .context(with_loc!("Fetching StatusNet config"))?;
             let config =
                 json::parse(&config).context(with_loc!("Parsing StatusNet config as JSON"))?;
+
+            // Indexing into JsonValue doesn't panic
+            #[allow(clippy::indexing_slicing)]
             let is_private = config["site"]["private"].as_bool().unwrap_or(false);
+
             Ok(is_private)
         }
 
@@ -243,7 +251,11 @@ async fn is_instance_private(
                 .await
                 .context(with_loc!("Fetching Siteinfo.json"))?;
             let siteinfo = json::parse(&siteinfo).context(with_loc!("Parsing Siteinfo as JSON"))?;
+
+            // Indexing into JsonValue doesn't panic
+            #[allow(clippy::indexing_slicing)]
             let hide_in_statistics = siteinfo["hide_in_statistics"].as_bool().unwrap_or(false);
+
             Ok(hide_in_statistics)
         }
 
