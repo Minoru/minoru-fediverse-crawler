@@ -19,6 +19,9 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/registry/index
 
+      - name: "Install project's dependencies"
+        run: sudo apt-get install --assume-yes libsystemd-dev
+
       - name: "cargo check"
         run: cargo check
 
