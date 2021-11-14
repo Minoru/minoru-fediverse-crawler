@@ -25,6 +25,9 @@ jobs:
       - name: "cargo check"
         run: cargo check
 
+      - name: "cargo clippy"
+        run: cargo clippy
+
       - name: "cargo build"
         run: cargo build
 
