@@ -8,11 +8,16 @@ Type=simple
 User=fedicrawler
 WorkingDirectory=/home/fedicrawler
 ExecStart=/home/fedicrawler/minoru-fediverse-crawler
+
+# The service is supposed to run indefinitely, so restart it in all cases —
+# even if it exited with a "success" error code, by itself.
 Restart=always
 # The service should normally finish within three seconds, so 5 is plenty.
 TimeoutSec=5
 
 Nice=5
+
+NoNewPrivileges=yes
 
 [Install]
 WantedBy=multi-user.target
