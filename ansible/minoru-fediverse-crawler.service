@@ -41,11 +41,15 @@ ProtectControlGroups=yes
 ProtectHostname=yes
 ProtectKernelLogs=yes
 ProtectKernelModules=yes
+ProtectProc=invisible
 # IPv4 and IPv6 sockets are needed to connect to Fediverse instances
 # Unix socket is needed to connect to journald
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=yes
 RestrictRealtime=yes
+
+PrivateTmp=yes
+PrivateUsers=yes
 
 [Install]
 WantedBy=multi-user.target
