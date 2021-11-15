@@ -5,19 +5,25 @@
   tasks:
   - name: Deploy index.html.
     copy:
-      src: ../index.html
+      src: "{{ item.src }}"
       dest: /home/fedicrawler/www/
       owner: fedicrawler
       group: fedicrawler
       mode: "u=rw,go=r"
+    with_items:
+      - { src: "../index.html" }
+      - { src: "../index.html.gz" }
 
-  - name: Ensure there is a symlink from www/instances.json to the real thing.
+  - name: Ensure there is a symlink from www/instances.json{,.gz} to the real thing.
     file:
-      src: /home/fedicrawler/instances.json
-      dest: /home/fedicrawler/www/instances.json
+      src: "/home/fedicrawler/{{ item.name }}"
+      dest: "/home/fedicrawler/www/{{ item.name }}"
       state: link
       # Create it even if the target file doens't exist.
       force: yes
+    with_items:
+      - { name: "instances.json" }
+      - { name: "instances.json.gz" }
 
   - name: Check if systemd service already exists.
     stat:

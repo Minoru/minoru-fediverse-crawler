@@ -629,6 +629,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "fastrand",
+ "flate2",
  "futures",
  "json",
  "lexopt",

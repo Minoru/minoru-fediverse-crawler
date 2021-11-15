@@ -1,14 +1,17 @@
-all: index.html target/release/minoru-fediverse-crawler instance_states.svg
+all: index.html index.html.gz target/release/minoru-fediverse-crawler instance_states.svg
 
 index.html: index.md index.css
 	pandoc --to html5 --output index.html --include-in-header index.css --standalone index.md
+
+index.html.gz: index.html
+	gzip --best --keep index.html
 
 # Cargo takes care of rebuilding this file when necessary; we just have to
 # force Make to run Cargo even if Make doesn't see a reason to run it.
 target/release/minoru-fediverse-crawler: FORCE
 	cargo build --release
 
-deploy: index.html ansible/minoru-fediverse-crawler.service target/release/minoru-fediverse-crawler
+deploy: index.html index.html.gz ansible/minoru-fediverse-crawler.service target/release/minoru-fediverse-crawler
 	ansible-playbook --ask-become-pass ansible/deploy.yml
 
 instance_states.svg: instance_states.odg

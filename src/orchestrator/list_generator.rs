@@ -49,11 +49,27 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
     }
 
     let instances = json::stringify(instances);
+    write("instances.json", instances.as_bytes()).context(with_loc!("Writing instances.json"))?;
 
+    let gzipped_instances = {
+        use flate2::{write::GzEncoder, Compression};
+
+        let mut e = GzEncoder::new(Vec::new(), Compression::best());
+        e.write_all(instances.as_bytes())
+            .context(with_loc!("Compressing instances list"))?;
+        e.finish().context(with_loc!("Finishing gzip stream"))?
+    };
+    write("instances.json.gz", &gzipped_instances)
+        .context(with_loc!("Writing instances.json.gz"))?;
+
+    Ok(())
+}
+
+fn write(filename: &str, data: &[u8]) -> anyhow::Result<()> {
     let mut file = tempfile::NamedTempFile::new_in(".")
         .context(with_loc!("Creating a temporary file in current directory"))?;
-    file.write_all(instances.as_bytes())
-        .context(with_loc!("Writing instances into a temporary file"))?;
+    file.write_all(data)
+        .context(with_loc!("Writing data into a temporary file"))?;
 
     {
         use std::os::unix::fs::PermissionsExt;
@@ -68,8 +84,7 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
             .context(with_loc!("Setting permissions for the temporary file"))?;
     }
 
-    file.persist("instances.json")
-        .context(with_loc!("Renaming temporary file to 'instances.json'"))?;
-
+    file.persist(filename)
+        .context(with_loc!("Renaming temporary file to the desired filename"))?;
     Ok(())
 }

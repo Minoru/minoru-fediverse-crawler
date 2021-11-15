@@ -3,4 +3,6 @@
 /minoru-fediverse-crawler.db-shm
 /minoru-fediverse-crawler.db-wal
 /instances.json
+/instances.json.gz
 /index.html
+/index.html.gz
