@@ -8,11 +8,48 @@ Type=simple
 User=fedicrawler
 WorkingDirectory=/home/fedicrawler
 ExecStart=/home/fedicrawler/minoru-fediverse-crawler
+
+# The service is supposed to run indefinitely, so restart it in all cases —
+# even if it exited with a "success" error code, by itself.
 Restart=always
 # The service should normally finish within three seconds, so 5 is plenty.
 TimeoutSec=5
 
 Nice=5
+
+# Disallow escalation of privileges
+NoNewPrivileges=yes
+RestrictSUIDSGID=yes
+
+CapabilityBoundingSet=
+
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=-@mount
+SystemCallErrorNumber=EPERM
+
+# Make the entire filesystem read-only, except the user's homedir.
+ProtectSystem=strict
+ReadWritePaths=/home/fedicrawler
+NoExecPaths=/
+ExecPaths=/home/fedicrawler
+PrivateDevices=yes
+ProtectKernelTunables=yes
+
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectProc=invisible
+# IPv4 and IPv6 sockets are needed to connect to Fediverse instances
+# Unix socket is needed to connect to journald
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+
+PrivateTmp=yes
+PrivateUsers=yes
 
 [Install]
 WantedBy=multi-user.target
