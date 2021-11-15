@@ -12,5 +12,7 @@ Restart=always
 # The service should normally finish within three seconds, so 5 is plenty.
 TimeoutSec=5
 
+Nice=5
+
 [Install]
 WantedBy=multi-user.target
