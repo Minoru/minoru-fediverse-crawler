@@ -25,7 +25,25 @@ CapabilityBoundingSet=
 
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
+SystemCallFilter=-@mount
 SystemCallErrorNumber=EPERM
+
+# Make the entire filesystem read-only, except the user's homedir.
+ProtectSystem=strict
+ReadWritePaths=/home/fedicrawler
+NoExecPaths=/
+ExecPaths=/home/fedicrawler
+PrivateDevices=yes
+ProtectKernelTunables=yes
+
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
 
 [Install]
 WantedBy=multi-user.target
