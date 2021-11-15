@@ -17,7 +17,9 @@ TimeoutSec=5
 
 Nice=5
 
+# Disallow escalation of privileges
 NoNewPrivileges=yes
+RestrictSUIDSGID=yes
 
 [Install]
 WantedBy=multi-user.target
