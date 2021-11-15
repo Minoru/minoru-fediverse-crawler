@@ -426,6 +426,20 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
     tx.commit().context(with_loc!("Committing the transaction"))
 }
 
+fn is_moving_to_that_host_already(tx: &Transaction, from: i64, to: i64) -> anyhow::Result<bool> {
+    Ok(tx.query_row(
+        "SELECT count(id)
+        FROM moving_state_data
+        WHERE instance = ?1
+            AND moving_to = ?2",
+        params![from, to],
+        |row| {
+            let count: u64 = row.get(0)?;
+            Ok(count > 0)
+        },
+    )?)
+}
+
 /// Note down that the instance has moved to another.
 ///
 /// This will initially mark the instance with the "moving" state, and after calling this function
@@ -440,7 +454,28 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
     let (instance_id, state) =
         get_instance(&tx, instance).context(with_loc!("Getting instance id and state"))?;
     if state == InstanceState::Moved {
-        return Ok(());
+        let (to_instance_id, _) =
+            get_instance(&tx, to).context(with_loc!("Getting instance id"))?;
+        let already_moving_there = is_moving_to_that_host_already(&tx, instance_id, to_instance_id)
+            .context(with_loc!("Checking if moving to that instance already"))?;
+        if !already_moving_there {
+            // Redirect's target changed; change the state back to "moving"
+
+            delete_moved_state_data(&tx, instance_id)
+                .context(with_loc!("Deleting from table 'moved_state_data'"))?;
+
+            tx.execute(
+                "INSERT INTO moving_state_data(instance, previous_state, moving_since, moving_to)
+                VALUES (?1, ?2, ?3, ?4)",
+                params![instance_id, state, UnixTimestamp(now), to_instance_id],
+            )
+            .context(with_loc!("Inserting into 'moving_state_data'"))?;
+
+            set_instance_state(&tx, instance_id, InstanceState::Moving)
+                .context(with_loc!("Marking instance as moving"))?;
+        }
+
+        return tx.commit().context(with_loc!("Committing the transaction"));
     }
 
     assert_ne!(state, InstanceState::Moved);
@@ -483,17 +518,10 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
         InstanceState::Moving => {
             let (to_instance_id, _) =
                 get_instance(&tx, to).context(with_loc!("Getting instance id"))?;
-            let is_moving_to_that_host_already: u64 = tx
-                .query_row(
-                    "SELECT count(id)
-                    FROM moving_state_data
-                    WHERE instance = ?1
-                        AND moving_to = ?2",
-                    params![instance_id, to_instance_id],
-                    |row| row.get(0),
-                )
-                .context(with_loc!("Checking if moving to that instance already"))?;
-            if is_moving_to_that_host_already > 0 {
+            let already_moving_there =
+                is_moving_to_that_host_already(&tx, instance_id, to_instance_id)
+                    .context(with_loc!("Checking if moving to that instance already"))?;
+            if already_moving_there {
                 // We're being redirected to the same host as before; update the counts
                 tx.execute(
                     "UPDATE moving_state_data
