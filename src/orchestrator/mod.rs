@@ -32,8 +32,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     let terminate = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGINT, terminate.clone())
         .context(with_loc!("Setting up a SIGINT hook"))?;
-    signal_hook::flag::register(signal_hook::consts::SIGHUP, terminate.clone())
-        .context(with_loc!("Setting up a SIGHUP hook"))?;
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, terminate.clone())
+        .context(with_loc!("Setting up a SIGTERM hook"))?;
 
     let mut time_to_generate_a_list = chrono::offset::Utc::now();
 
