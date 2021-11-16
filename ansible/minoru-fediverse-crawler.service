@@ -6,8 +6,8 @@ After=network-online.target
 [Service]
 Type=simple
 User=fedicrawler
-WorkingDirectory=/home/fedicrawler
-ExecStart=/home/fedicrawler/minoru-fediverse-crawler
+WorkingDirectory=/var/lib/fedicrawler
+ExecStart=/var/lib/fedicrawler/minoru-fediverse-crawler
 
 # The service is supposed to run indefinitely, so restart it in all cases —
 # even if it exited with a "success" error code, by itself.
@@ -30,9 +30,9 @@ SystemCallErrorNumber=EPERM
 
 # Make the entire filesystem read-only, except the user's homedir.
 ProtectSystem=strict
-ReadWritePaths=/home/fedicrawler
+ReadWritePaths=/var/lib/fedicrawler
 NoExecPaths=/
-ExecPaths=/home/fedicrawler
+ExecPaths=/var/lib/fedicrawler
 PrivateDevices=yes
 ProtectKernelTunables=yes
 

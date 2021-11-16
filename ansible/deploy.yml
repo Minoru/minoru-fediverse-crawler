@@ -6,7 +6,7 @@
   - name: Deploy index.html.
     copy:
       src: "{{ item.src }}"
-      dest: /home/fedicrawler/www/
+      dest: /var/lib/fedicrawler/www/
       owner: fedicrawler
       group: fedicrawler
       mode: "u=rw,go=r"
@@ -16,8 +16,8 @@
 
   - name: Ensure there is a symlink from www/instances.json{,.gz} to the real thing.
     file:
-      src: "/home/fedicrawler/{{ item.name }}"
-      dest: "/home/fedicrawler/www/{{ item.name }}"
+      src: "/var/lib/fedicrawler/{{ item.name }}"
+      dest: "/var/lib/fedicrawler/www/{{ item.name }}"
       state: link
       # Create it even if the target file doens't exist.
       force: yes
@@ -47,7 +47,7 @@
   - name: Deploy the crawler.
     copy:
       src: ../target/release/minoru-fediverse-crawler
-      dest: /home/fedicrawler/
+      dest: /var/lib/fedicrawler/
       owner: fedicrawler
       group: fedicrawler
       # Security precaution: the user can't overwrite the binary.
