@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "addr"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "600754573c1accfc3c564977767e78e3c6c2b477b8bb10826ae4bfe210e01108"
+checksum = "24ea36343d3e906f016eb1cacdb65c5e91e387f6d6a084d112c8b6c71e2d9685"
 dependencies = [
  "psl",
  "psl-types",
