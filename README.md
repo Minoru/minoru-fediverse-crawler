@@ -13,5 +13,5 @@ trying to build here.
 GNU Affero GPL 3.0 or later.
 
 [wikipedia-fediverse]: https://en.wikipedia.org/wiki/Fediverse "Fediverse — Wikipedia"
-[nfp]: https://nodes.fediverse.party "Fediverse instances list"
+[nfp]: https://nodes.fediverse.party "Fediverse nodes list"
 [lightone]: https://mastodon.xyz/@lightone "lostinlight (@lightone@mastodon.xyz) — Mastodon"

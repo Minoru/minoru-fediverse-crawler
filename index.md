@@ -1,11 +1,11 @@
 ---
-pagetitle: Fediverse instances list
+pagetitle: Fediverse nodes list
 ---
 
 <h1>&nbsp;<!-- spacer --></h1>
 
 <p style="text-align: center;">
-👉 <a href="./instances.json">instances.json</a> 👈
+👉 <a href="./nodes.json">nodes.json</a> 👈
 </p>
 
 <h1>&nbsp;<!-- spacer --></h1>
@@ -18,7 +18,7 @@ To **help keep track of Fediverse's growth** (or stagnation T_T).
 [Fediverse.Observer][fediverse.observer] and other public hubs provide some
 numbers, but they don't automatically discover new servers. As known instances
 slowly disappear, these hubs can give an impression that Fediverse is shrinking.
-This crawler discovers new instances so hubs don't have to.
+This crawler discovers new nodes so hubs don't have to.
 
 [the-federation]: https://the-federation.info "the federation — a statistics hub"
 [fedidb]: https://fedidb.org "FediDB — Developer Tools for ActivityPub"
@@ -30,9 +30,9 @@ instances to newcomers? Some sort of a cataloguing effort? Global search? We
 want you to go straight to building *that*, without spending your energy on
 re-inventing the "Fediverse crawler" wheel.
 
-## How to remove an instance from this list?
+## How to remove a node from this list?
 
-You can only do this if you're the instance's administrator.
+You can only do this if you're the node's administrator.
 
 If you're running **GNU Social** or **Friendica**: set the `site.private`
 property to `1` or `true` in the StatusNet config.
@@ -47,10 +47,10 @@ User-agent: MinoruFediverseCrawler
 Disallow: /
 ```
 
-## How to add an instance to this list?
+## How to add a node to this list?
 
 Simply follow someone on Fediverse ツ Soon enough, the crawler will discover the
-instance and add it to the list.
+node and add it to the list.
 
 Make sure the instance didn't opt out of statistics as described above.
 
@@ -60,8 +60,7 @@ issue</a>.
 
 ## What exactly does the list contain?
 
-It's a JSON array of hostnames of all alive instances that are known to the
-crawler.
+It's a JSON array of hostnames of all alive nodes that are known to the crawler.
 
 "Alive" means any instance that responded with NodeInfo at least once within the
 last week. It doesn't imply that the instance federates with anyone, or has a web
@@ -92,11 +91,11 @@ Please do not fetch the list very often. It doesn't make sense; only a couple
 instances appear and die every day, and you probably don't need to know about it
 *right away*. This is not a monitoring service.
 
-The instances themselves are checked about once a day. The crawler also
-maintains internal lists of "moved" and "dead" instances, which are checked once
-a week (just in case they come back to life). The checks are spread out
-throughout the day with some jitter, that's why the list is updated more often
-than the check period.
+The nodes themselves are checked about once a day. The crawler also maintains
+internal lists of "moved" and "dead" instances, which are checked once a week
+(just in case they come back to life). The checks are spread throughout the day
+with some jitter, that's why the list is updated more often than the check
+period.
 
 Crawler's user agent string is `Minoru's Fediverse Crawler
 (+https://nodes.fediverse.party)`, and it makes requests from the following IP

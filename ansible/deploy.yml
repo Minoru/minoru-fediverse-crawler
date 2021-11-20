@@ -14,15 +14,26 @@
       - { src: "../index.html" }
       - { src: "../index.html.gz" }
 
-  - name: Ensure there is a symlink from www/instances.json{,.gz} to the real thing.
+  - name: Ensure there is a symlink from www/{nodes,instances}.json to instances.json.
     file:
-      src: "/var/lib/fedicrawler/{{ item.name }}"
+      src: "/var/lib/fedicrawler/instances.json"
       dest: "/var/lib/fedicrawler/www/{{ item.name }}"
       state: link
       # Create it even if the target file doens't exist.
       force: yes
     with_items:
+      - { name: "nodes.json" }
       - { name: "instances.json" }
+
+  - name: Ensure there is a symlink from www/{nodes,instances}.json.gz to instances.json.gz.
+    file:
+      src: "/var/lib/fedicrawler/instances.json.gz"
+      dest: "/var/lib/fedicrawler/www/{{ item.name }}"
+      state: link
+      # Create it even if the target file doens't exist.
+      force: yes
+    with_items:
+      - { name: "nodes.json.gz" }
       - { name: "instances.json.gz" }
 
   - name: Check if systemd service already exists.
