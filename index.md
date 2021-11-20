@@ -88,15 +88,22 @@ Suffix List][publicsuffix] are allowed.
 
 About every six hours.
 
+Please do not fetch the list very often. It doesn't make sense; only a couple
+instances appear and die every day, and you probably don't need to know about it
+*right away*. This is not a monitoring service.
+
 The instances themselves are checked about once a day. The crawler also
 maintains internal lists of "moved" and "dead" instances, which are checked once
-a week (just in case any of them come back to life). The checks are spread out
+a week (just in case they come back to life). The checks are spread out
 throughout the day with some jitter, that's why the list is updated more often
 than the check period.
 
-Please do not request the list very often. It doesn't make sense; only a couple
-instances appear and die every day, and you probably don't need to know about it
-*right away*. This is not a monitoring service.
+Crawler's user agent string is `Minoru's Fediverse Crawler
+(+https://nodes.fediverse.party)`, and it makes requests from the following IP
+addresses:
+
+* 84.22.103.136
+* 2a02:2770:8:0:21a:4aff:fefd:4598
 
 ## Who is responsible for this list?
 
