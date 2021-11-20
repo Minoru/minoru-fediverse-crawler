@@ -4,7 +4,7 @@ index.html: index.md index.css
 	pandoc --to html5 --output index.html --include-in-header index.css --standalone index.md
 
 index.html.gz: index.html
-	gzip --best --keep index.html
+	gzip --force --best --keep index.html
 
 # Cargo takes care of rebuilding this file when necessary; we just have to
 # force Make to run Cargo even if Make doesn't see a reason to run it.
