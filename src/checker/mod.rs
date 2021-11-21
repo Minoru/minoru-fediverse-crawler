@@ -309,7 +309,7 @@ async fn is_instance_private(
             Ok(is_private)
         }
 
-        "hubzilla" => {
+        "hubzilla" | "red" => {
             let siteinfo = get_siteinfo(client, host)
                 .await
                 .context(with_loc!("Fetching Siteinfo.json"))?;
