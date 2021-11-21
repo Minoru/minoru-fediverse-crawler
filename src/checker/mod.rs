@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 use url::{Host, Url};
 
 pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
-    let rt = Runtime::new()?;
+    let rt = Runtime::new().context(with_loc!("Starting Tokio runtime"))?;
     info!(logger, "Started Tokio runtime");
 
     let logger = logger.new(o!("host" => host.to_string()));
@@ -31,7 +31,8 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
                         info!(logger, "Instance is moving to {}", to);
                         let moving = serde_json::to_string(&ipc::CheckerResponse::State {
                             state: ipc::InstanceState::Moving { to },
-                        })?;
+                        })
+                        .context(with_loc!("Serializing Moving message"))?;
                         println!("{}", moving);
                     }
                 }
@@ -41,7 +42,8 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
                         info!(logger, "Instance has moved to {}", to);
                         let moved = serde_json::to_string(&ipc::CheckerResponse::State {
                             state: ipc::InstanceState::Moved { to },
-                        })?;
+                        })
+                        .context(with_loc!("Serializing Moved message"))?;
                         println!("{}", moved);
                     }
                 }
@@ -61,9 +63,13 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
 }
 
 async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
-    let client = HttpClient::new(logger.clone(), host).await?;
+    let client = HttpClient::new(logger.clone(), host)
+        .await
+        .context(with_loc!("Initializing HTTP client"))?;
 
-    let software = get_software(logger, &client, host).await?;
+    let software = get_software(logger, &client, host)
+        .await
+        .context(with_loc!("Determining instance's software"))?;
     info!(logger, "{} runs {}", host, software);
 
     let hide_from_list = {
@@ -77,13 +83,17 @@ async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
     };
     let alive = serde_json::to_string(&ipc::CheckerResponse::State {
         state: ipc::InstanceState::Alive { hide_from_list },
-    })?;
+    })
+    .context(with_loc!("Serializing Alive message"))?;
     println!("{}", alive);
 
-    let peers = get_peers(logger, &client, host, &software).await?;
+    let peers = get_peers(logger, &client, host, &software)
+        .await
+        .context(with_loc!("Fetching instance's peers list"))?;
     info!(logger, "{} has {} peers", host, peers.len());
     for instance in peers {
-        let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { peer: instance })?;
+        let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { peer: instance })
+            .context(with_loc!("Serializing Peer message"))?;
         println!("{}", peer);
     }
 
@@ -91,7 +101,9 @@ async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
 }
 
 async fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyhow::Result<String> {
-    let nodeinfo = fetch_nodeinfo(logger, client, host).await?;
+    let nodeinfo = fetch_nodeinfo(logger, client, host)
+        .await
+        .context(with_loc!("Fetching NodeInfo"))?;
     json::parse(&nodeinfo)
         .map(|obj| {
             // Indexing into JsonValue doesn't panic
@@ -106,6 +118,7 @@ async fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyh
             error!(logger, "{}", &msg; "json_error" => err.to_string());
             anyhow!(msg)
         })
+        .context(with_loc!("Extracting software make from NodeInfo"))
 }
 
 #[derive(Debug, Deserialize)]
@@ -124,9 +137,15 @@ async fn fetch_nodeinfo(
     client: &HttpClient,
     host: &Host,
 ) -> anyhow::Result<String> {
-    let pointer = fetch_nodeinfo_pointer(logger, client, host).await?;
-    let url = pick_highest_supported_nodeinfo_version(&pointer)?;
-    fetch_nodeinfo_document(logger, client, &url).await
+    let pointer = fetch_nodeinfo_pointer(logger, client, host)
+        .await
+        .context(with_loc!("Fetching NodeInfo well-known document"))?;
+    let url = pick_highest_supported_nodeinfo_version(&pointer).context(with_loc!(
+        "Picking the highest supported NodeInfo version out of JRD document"
+    ))?;
+    fetch_nodeinfo_document(logger, client, &url)
+        .await
+        .context(with_loc!("Fetching NodeInfo document"))
 }
 
 async fn fetch_nodeinfo_pointer(
@@ -135,7 +154,10 @@ async fn fetch_nodeinfo_pointer(
     host: &Host,
 ) -> anyhow::Result<NodeInfoPointer> {
     let url = format!("https://{}/.well-known/nodeinfo", host);
-    let response = client.get(&url).await?;
+    let response = client
+        .get(&url)
+        .await
+        .context(with_loc!("Fetching NodeInfo pointer"))?;
     response.error_for_status_ref().map_err(|err| {
         error!(
             logger, "Failed to fetch the well-known NodeInfo document: {}", err;
@@ -143,7 +165,10 @@ async fn fetch_nodeinfo_pointer(
         err
     })?;
 
-    Ok(response.json::<NodeInfoPointer>().await?)
+    Ok(response
+        .json::<NodeInfoPointer>()
+        .await
+        .context(with_loc!("Decoding NodeInfo pointer as JSON"))?)
 }
 
 fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow::Result<Url> {
@@ -171,7 +196,8 @@ fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow:
                 pointer.links
             )
         })
-        .and_then(|u| Ok(Url::parse(u)?))
+        .and_then(|u| Ok(Url::parse(u).context(with_loc!("Parsing NodeInfo href as Url"))?))
+        .context(with_loc!("Picking highest supported NodeInfo version"))
 }
 
 async fn fetch_nodeinfo_document(
@@ -179,7 +205,10 @@ async fn fetch_nodeinfo_document(
     client: &HttpClient,
     url: &Url,
 ) -> anyhow::Result<String> {
-    let response = client.get(url.clone()).await?;
+    let response = client
+        .get(url.clone())
+        .await
+        .context(with_loc!("Fetching NodeInfo document"))?;
     response.error_for_status_ref().map_err(|err| {
         error!(
             logger, "Failed to fetch NodeInfo: {}", err;
@@ -187,7 +216,10 @@ async fn fetch_nodeinfo_document(
         err
     })?;
 
-    Ok(response.text().await?)
+    Ok(response
+        .text()
+        .await
+        .context(with_loc!("Getting NodeInfo document's body"))?)
 }
 
 async fn get_peers(
@@ -198,7 +230,9 @@ async fn get_peers(
 ) -> anyhow::Result<Vec<Host>> {
     match software {
         "mastodon" | "pleroma" | "misskey" | "bookwyrm" | "smithereen" => {
-            get_peers_mastodonish(logger, client, host).await
+            get_peers_mastodonish(logger, client, host)
+                .await
+                .context(with_loc!("Fetching peers list via Mastodon-ish API"))
         }
         _ => Ok(vec![]),
     }
@@ -210,7 +244,10 @@ async fn get_peers_mastodonish(
     host: &Host,
 ) -> anyhow::Result<Vec<Host>> {
     let url = format!("https://{}/api/v1/instance/peers", host);
-    let response = client.get(&url).await?;
+    let response = client
+        .get(&url)
+        .await
+        .context(with_loc!("Fetching Mastodon-ish peers list"))?;
     response.error_for_status_ref().map_err(|err| {
         error!(
             logger, "Failed to fetch Mastodon-ish peers: {}", err;
@@ -220,7 +257,8 @@ async fn get_peers_mastodonish(
 
     Ok(response
         .json::<Vec<String>>()
-        .await?
+        .await
+        .context(with_loc!("Parsing Mastodon-ish peers list as JSON"))?
         .into_iter()
         .map(Host::Domain)
         .collect())
