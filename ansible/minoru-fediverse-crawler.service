@@ -30,6 +30,7 @@ SystemCallErrorNumber=EPERM
 
 # Make the entire filesystem read-only, except the user's homedir.
 ProtectSystem=strict
+ProtectHome=yes
 ReadWritePaths=/var/lib/fedicrawler
 NoExecPaths=/
 ExecPaths=/var/lib/fedicrawler
