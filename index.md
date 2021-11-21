@@ -37,8 +37,8 @@ You can only do this if you're the node's administrator.
 If you're running **GNU Social** or **Friendica**: set the `site.private`
 property to `1` or `true` in the StatusNet config.
 
-If you're running **Hubzilla**: set `hide_in_statistics` property to `1` or
-`true` in `siteinfo.json`.
+If you're running **Hubzilla** or **Red**: set `hide_in_statistics` property to
+`1` or `true` in `siteinfo.json`.
 
 If you're running **anything else**: add the following to your `robots.txt`:
 
