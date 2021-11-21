@@ -1,7 +1,7 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use futures::future::{self, TryFutureExt};
 use reqwest::Client;
-use slog::{error, Logger};
+use slog::{error, info, Logger};
 use std::future::Future;
 use std::time::Duration;
 use url::{Host, Url};
@@ -73,27 +73,30 @@ impl HttpClient {
         // - follow redirects as long as they point to the same hostname:port, and schema didn't
         //   change
         // - stop after 10 redirects
-        let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
-            // This can't panic because in order to get redirected, we had to request some URL. So
-            // there's at least one previously-visited URL in the array.
-            #[allow(clippy::indexing_slicing)]
-            let previous: &Url = &attempt.previous()[0];
+        let redirect_policy = {
+            let logger = logger.clone();
+            reqwest::redirect::Policy::custom(move |attempt| {
+                // This can't panic because in order to get redirected, we had to request some URL. So
+                // there's at least one previously-visited URL in the array.
+                #[allow(clippy::indexing_slicing)]
+                let previous: &Url = &attempt.previous()[0];
 
-            if attempt.previous().len() > 10 {
-                error!(logger, "Too many redirects: {:?}", attempt.previous());
-                attempt.error("too many redirects")
-            } else if !is_same_origin(attempt.url(), previous) {
-                error!(
-                    logger,
-                    "Redirect points to {} which is of different origin that {}; stopping here",
-                    attempt.url(),
-                    previous
-                );
-                attempt.stop()
-            } else {
-                attempt.follow()
-            }
-        });
+                if attempt.previous().len() > 10 {
+                    error!(logger, "Too many redirects: {:?}", attempt.previous());
+                    attempt.error("too many redirects")
+                } else if !is_same_origin(attempt.url(), previous) {
+                    error!(
+                        logger,
+                        "Redirect points to {} which is of different origin that {}; stopping here",
+                        attempt.url(),
+                        previous
+                    );
+                    attempt.stop()
+                } else {
+                    attempt.follow()
+                }
+            })
+        };
         let inner = reqwest::ClientBuilder::new()
             .redirect(redirect_policy)
             .timeout(Duration::from_secs(30))
@@ -102,6 +105,7 @@ impl HttpClient {
             .map_err(HttpClientError::ReqwestError)?;
         let robots_txt = {
             let url = format!("https://{}/robots.txt", host);
+            info!(logger, "Fetching robots.txt");
             let response = inner
                 .get(url)
                 .timeout(Duration::from_secs(10))

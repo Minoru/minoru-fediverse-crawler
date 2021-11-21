@@ -51,13 +51,20 @@ async fn async_main(logger: &Logger, host: &Host) -> anyhow::Result<()> {
                 // Propagate all other errors upwards. A lack of response from the checker will
                 // make the orchestrator to mark this host as dead.
                 _ => {
-                    error!(logger, "The instance is dead");
+                    error!(logger, "The instance is dead: {:?}", error);
                 }
             }
+        } else {
+            error!(
+                logger,
+                "Couldn't downcast the error to HttpClientError: {:?}", e
+            );
         }
 
         return Err(e);
     }
+
+    info!(logger, "Check finished");
 
     Ok(())
 }
@@ -85,6 +92,7 @@ async fn try_check(logger: &Logger, host: &Host) -> anyhow::Result<()> {
         state: ipc::InstanceState::Alive { hide_from_list },
     })
     .context(with_loc!("Serializing Alive message"))?;
+    info!(logger, "The instance is alive");
     println!("{}", alive);
 
     let peers = get_peers(logger, &client, host, &software)
