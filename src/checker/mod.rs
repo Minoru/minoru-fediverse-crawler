@@ -130,11 +130,28 @@ async fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyh
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum NodeInfoPointerRaw {
+    Bare { links: NodeInfoPointerLink },
+    Array { links: Vec<NodeInfoPointerLink> },
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[serde(from = "NodeInfoPointerRaw")]
 struct NodeInfoPointer {
     links: Vec<NodeInfoPointerLink>,
 }
 
-#[derive(Debug, Deserialize)]
+impl From<NodeInfoPointerRaw> for NodeInfoPointer {
+    fn from(input: NodeInfoPointerRaw) -> NodeInfoPointer {
+        match input {
+            NodeInfoPointerRaw::Bare { links } => Self { links: vec![links] },
+            NodeInfoPointerRaw::Array { links } => Self { links },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Deserialize)]
 struct NodeInfoPointerLink {
     rel: String,
     href: String,
@@ -395,5 +412,18 @@ mod test {
             .unwrap(),
             Url::parse("http://example.org/highest is the first").unwrap()
         );
+    }
+
+    #[test]
+    fn broken_lemmy_nodeinfo_pointer() {
+        let input = r#"{"links":{"rel":"http://nodeinfo.diaspora.software/ns/schema/2.0","href":"https://lemmy.ml/nodeinfo/2.0.json"}}"#;
+        let parsed: NodeInfoPointer = serde_json::from_str(input).expect("Failed to parse");
+        let expected = NodeInfoPointer {
+            links: vec![NodeInfoPointerLink {
+                rel: "http://nodeinfo.diaspora.software/ns/schema/2.0".to_string(),
+                href: "https://lemmy.ml/nodeinfo/2.0.json".to_string(),
+            }],
+        };
+        assert_eq!(expected, parsed);
     }
 }
