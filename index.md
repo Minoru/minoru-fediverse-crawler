@@ -72,10 +72,10 @@ could be unreachable from the crawler's host (as is the case with Tor and I2P
 addresses).
 
 "Known" means that the crawler has seen the hostname in someone's peer list. As
-of 2021-11-09, the crawler requests `/api/v1/peers` endpoint from Mastodon,
-Pleroma, Misskey, BookWyrm, and Smithereen servers. If an instance doesn't
-federate with anyone, it would be missing from the peers lists, and the crawler
-won't know about its existence.
+of 2021-11-09, the crawler requests `/api/v1/instance/peers` endpoint from
+Mastodon, Pleroma, Misskey, BookWyrm, and Smithereen servers. If an instance
+doesn't federate with anyone, it would be missing from the peers lists, and the
+crawler won't know about its existence.
 
 Only hostnames are included in the list; no ports, no URL schemas (HTTPS and 443
 are assumed). Furthermore, only hostnames whose suffixes are on the [Public
