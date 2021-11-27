@@ -39,23 +39,45 @@
   - name: Check if systemd service already exists.
     stat:
       path: /etc/systemd/system/minoru-fediverse-crawler.service
+    register: systemd_service_file
+
+  - name: Check if systemd service file should be changed.
+    become: yes
+    copy:
+      src: minoru-fediverse-crawler.service
+      dest: /etc/systemd/system/
+      mode: "u=rw,go=r"
+    check_mode: yes
     register: systemd_service
+
+  - name: Check if crawler needs to be re-deployed.
+    copy:
+      src: ../target/release/minoru-fediverse-crawler
+      dest: /var/lib/fedicrawler/
+      owner: fedicrawler
+      group: fedicrawler
+      # Security precaution: the user can't overwrite the binary.
+      mode: "u=rx,go="
+    check_mode: yes
+    register: crawler
 
   - name: Stop systemd service.
     become: yes
-    when: systemd_service.stat.exists
+    when: systemd_service_file.stat.exists and (systemd_service.changed or crawler.changed)
     service:
       name: minoru-fediverse-crawler
       state: stopped
 
   - name: Ensure systemd service file exists.
     become: yes
+    when: systemd_service.changed
     copy:
       src: minoru-fediverse-crawler.service
       dest: /etc/systemd/system/
       mode: "u=rw,go=r"
 
   - name: Deploy the crawler.
+    when: crawler.changed
     copy:
       src: ../target/release/minoru-fediverse-crawler
       dest: /var/lib/fedicrawler/
