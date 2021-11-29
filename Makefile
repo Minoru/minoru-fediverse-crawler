@@ -1,7 +1,7 @@
 all: index.html index.html.gz target/release/minoru-fediverse-crawler instance_states.svg
 
-index.html: index.md index.css
-	pandoc --to html5 --output index.html --include-in-header index.css --standalone index.md
+index.html: index.md header.html
+	pandoc --to html5 --output index.html --include-in-header header.html --standalone index.md
 
 index.html.gz: index.html
 	gzip --force --best --keep index.html

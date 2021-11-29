@@ -3,6 +3,14 @@
   become: yes
 
   tasks:
+  - name: Deploy favicon.ico.
+    copy:
+      src: "favicon.ico"
+      dest: /var/lib/fedicrawler/www/
+      owner: fedicrawler
+      group: fedicrawler
+      mode: "u=rw,go=r"
+
   - name: Deploy index.html.
     copy:
       src: "{{ item.src }}"
