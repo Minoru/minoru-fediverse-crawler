@@ -91,6 +91,8 @@ fn process_checker_response(
             serde_json::from_str(&line)
                 .context(with_loc!("Failed to deserialize checker's response"))?
         } else {
+            info!(logger, "No response from checker, marking the instance as dead");
+
             return db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target));
         }
     };
