@@ -408,7 +408,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
             // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
             // "daily" checks per peal week. So 6 failed checks means "we've been failing for about
             // a week".
-            if checks_count > 6 && since > week_ago {
+            if checks_count > 6 && since < week_ago {
                 delete_from_hidden_instances(&tx, instance_id)
                     .context(with_loc!("Deleting from 'hidden_instances'"))?;
                 delete_dying_state_data(&tx, instance_id)
@@ -551,7 +551,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
                 // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
                 // "daily" checks per peal week. So 6 redirects mean "we've been redirected for
                 // about a week".
-                if redirects_count > 6 && since > week_ago {
+                if redirects_count > 6 && since < week_ago {
                     delete_from_hidden_instances(&tx, instance_id)
                         .context(with_loc!("Deleting from 'hidden_instances'"))?;
                     delete_moving_state_data(&tx, instance_id)
