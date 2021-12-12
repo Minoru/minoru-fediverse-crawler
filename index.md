@@ -16,9 +16,10 @@ To **help keep track of Fediverse's growth** (or stagnation T_T).
 
 [The-federation.info][the-federation], [FediDB.org][fedidb],
 [Fediverse.Observer][fediverse.observer] and other public hubs provide some
-numbers, but they don't automatically discover new servers. As known instances
-slowly disappear, these hubs can give an impression that Fediverse is shrinking.
-This crawler discovers new nodes so hubs don't have to.
+numbers, but most of them don't automatically discover new servers; the only
+exception is fediverse.observer. As known instances slowly disappear, these hubs
+can give an impression that Fediverse is shrinking. This crawler discovers new
+nodes so hubs don't have to.
 
 [the-federation]: https://the-federation.info "the federation — a statistics hub"
 [fedidb]: https://fedidb.org "FediDB — Developer Tools for ActivityPub"
