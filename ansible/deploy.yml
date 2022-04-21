@@ -101,3 +101,37 @@
       name: minoru-fediverse-crawler
       state: started
       enabled: yes
+
+  - name: Ensure scripts are deployed.
+    copy:
+      src: "../scripts/{{ item.name }}"
+      dest: "/var/lib/fedicrawler/{{ item.name }}"
+      owner: fedicrawler
+      group: fedicrawler
+      mode: "u=rx,go="
+    with_items:
+      - { name: "fetch_diasporg" }
+      - { name: "fetch_fedidb" }
+      - { name: "fetch_fediverse_observer" }
+      - { name: "fetch_lemmy" }
+      - { name: "fetch_misskey" }
+      - { name: "fetch_peertube" }
+      - { name: "fetch_the-federation" }
+      - { name: "fetch_the-federation_pods" }
+
+  - name: Ensure cron jobs to run scripts daily are installed.
+    cron:
+      user: fedicrawler
+      name: "{{ item.name }}"
+      hour: "{{ item.hour }}"
+      minute: "{{ item.minute }}"
+      job: "(cd /var/lib/fedicrawler/ && ./{{ item.name }} | ./minoru-fediverse-crawler --add-instances)"
+    with_items:
+      - { name: "fetch_diasporg", hour: "3", minute: "35" }
+      - { name: "fetch_fedidb", hour: "4", minute: "15" }
+      - { name: "fetch_fediverse_observer", hour: "11", minute: "10" }
+      - { name: "fetch_lemmy", hour: "11", minute: "30" }
+      - { name: "fetch_misskey", hour: "11", minute: "35" }
+      - { name: "fetch_peertube", hour: "19", minute: "15" }
+      - { name: "fetch_the-federation", hour: "20", minute: "25" }
+      - { name: "fetch_the-federation_pods", hour: "22", minute: "25" }
