@@ -18,6 +18,7 @@ instance_states.svg: instance_states.odg
 	libreoffice --headless --convert-to svg:draw_svg_Export $<
 
 clean:
+	cargo clean
 	rm -f index.html
 
 .PHONY: deploy clean
