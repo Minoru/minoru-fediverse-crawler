@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -e
+
+curl \
+    --silent \
+    'https://instanceapp.misskey.page/instances.json' \
+| \
+jq '.instancesInfos | map(.url)' \
+| \
+grep --invert-match '^[][]' \
+| \
+sed 's#^\s*"##; s#",*$##'
