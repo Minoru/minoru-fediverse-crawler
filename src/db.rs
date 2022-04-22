@@ -440,6 +440,20 @@ fn is_moving_to_that_host_already(tx: &Transaction, from: i64, to: i64) -> anyho
     )?)
 }
 
+fn has_moved_to_that_host_already(tx: &Transaction, from: i64, to: i64) -> anyhow::Result<bool> {
+    Ok(tx.query_row(
+        "SELECT count(id)
+        FROM moved_state_data
+        WHERE instance = ?1
+            AND moved_to = ?2",
+        params![from, to],
+        |row| {
+            let count: u64 = row.get(0)?;
+            Ok(count > 0)
+        },
+    )?)
+}
+
 /// Note down that the instance has moved to another.
 ///
 /// This will initially mark the instance with the "moving" state, and after calling this function
@@ -456,9 +470,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
     if state == InstanceState::Moved {
         let (to_instance_id, _) =
             get_instance(&tx, to).context(with_loc!("Getting instance id"))?;
-        let already_moving_there = is_moving_to_that_host_already(&tx, instance_id, to_instance_id)
-            .context(with_loc!("Checking if moving to that instance already"))?;
-        if !already_moving_there {
+        let already_moved_there = has_moved_to_that_host_already(&tx, instance_id, to_instance_id)
+            .context(with_loc!("Checking if moved to that instance already"))?;
+        if !already_moved_there {
             // Redirect's target changed; change the state back to "moving"
 
             delete_moved_state_data(&tx, instance_id)
