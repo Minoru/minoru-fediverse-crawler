@@ -102,6 +102,12 @@
       state: started
       enabled: yes
 
+  - name: Ensure jq is installed (for scripts).
+    apt:
+      name: jq
+      state: present
+      cache_valid_time: 3600
+
   - name: Ensure scripts are deployed.
     copy:
       src: "../scripts/{{ item.name }}"
