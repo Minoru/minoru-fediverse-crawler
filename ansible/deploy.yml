@@ -129,15 +129,16 @@
     cron:
       user: fedicrawler
       name: "{{ item.name }}"
+      weekday: "{{ item.weekday }}"
       hour: "{{ item.hour }}"
       minute: "{{ item.minute }}"
       job: "(cd /var/lib/fedicrawler/ && ./{{ item.name }} | ./minoru-fediverse-crawler --add-instances)"
     with_items:
-      - { name: "fetch_diasporg", hour: "3", minute: "35" }
-      - { name: "fetch_fedidb", hour: "4", minute: "15" }
-      - { name: "fetch_fediverse_observer", hour: "11", minute: "10" }
-      - { name: "fetch_lemmy", hour: "11", minute: "30" }
-      - { name: "fetch_misskey", hour: "11", minute: "35" }
-      - { name: "fetch_peertube", hour: "19", minute: "15" }
-      - { name: "fetch_the-federation", hour: "20", minute: "25" }
-      - { name: "fetch_the-federation_pods", hour: "22", minute: "25" }
+      - { name: "fetch_diasporg", weekday: "0", hour: "3", minute: "35" }
+      - { name: "fetch_fedidb", weekday: "1", hour: "4", minute: "15" }
+      - { name: "fetch_fediverse_observer", weekday: "2", hour: "11", minute: "10" }
+      - { name: "fetch_lemmy", weekday: "3", hour: "11", minute: "30" }
+      - { name: "fetch_misskey", weekday: "4", hour: "11", minute: "35" }
+      - { name: "fetch_peertube", weekday: "5", hour: "19", minute: "15" }
+      - { name: "fetch_the-federation", weekday: "6", hour: "20", minute: "25" }
+      - { name: "fetch_the-federation_pods", weekday: "0", hour: "22", minute: "25" }
