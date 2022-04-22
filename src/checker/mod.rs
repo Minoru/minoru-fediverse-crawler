@@ -190,10 +190,10 @@ async fn fetch_nodeinfo_pointer(
         err
     })?;
 
-    Ok(response
+    response
         .json::<NodeInfoPointer>()
         .await
-        .context(with_loc!("Decoding NodeInfo pointer as JSON"))?)
+        .context(with_loc!("Decoding NodeInfo pointer as JSON"))
 }
 
 fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow::Result<Url> {
@@ -221,7 +221,7 @@ fn pick_highest_supported_nodeinfo_version(pointer: &NodeInfoPointer) -> anyhow:
                 pointer.links
             )
         })
-        .and_then(|u| Ok(Url::parse(u).context(with_loc!("Parsing NodeInfo href as Url"))?))
+        .and_then(|u| Url::parse(u).context(with_loc!("Parsing NodeInfo href as Url")))
         .context(with_loc!("Picking highest supported NodeInfo version"))
 }
 
@@ -241,10 +241,10 @@ async fn fetch_nodeinfo_document(
         err
     })?;
 
-    Ok(response
+    response
         .text()
         .await
-        .context(with_loc!("Getting NodeInfo document's body"))?)
+        .context(with_loc!("Getting NodeInfo document's body"))
 }
 
 async fn get_peers(
