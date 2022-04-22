@@ -125,7 +125,7 @@
       - { name: "fetch_the-federation" }
       - { name: "fetch_the-federation_pods" }
 
-  - name: Ensure cron jobs to run scripts daily are installed.
+  - name: "Ensure cron jobs to run fetch_* scripts are installed."
     cron:
       user: fedicrawler
       name: "{{ item.name }}"
