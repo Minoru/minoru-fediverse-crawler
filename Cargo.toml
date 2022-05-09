@@ -12,13 +12,12 @@ chrono = "0.4"
 fastrand = "1"
 json = "0.12"
 lexopt = "0.2"
-reqwest = { version = "0.11", features = [ "gzip", "brotli", "deflate", "json" ] }
+ureq = { version = "2", features = [ "gzip", "brotli", "json" ] }
 rusqlite = "0.26"
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 slog = "2"
 slog-journald = "2"
-tokio = { version = "1", features = [ "full" ] }
 url = { version = "2", features = [ "serde" ] }
 libsqlite3-sys = "0.23"
 rusty_pool = "0.6"

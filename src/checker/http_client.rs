@@ -1,9 +1,7 @@
 //! HTTP client that automatically checks requests against robots.txt.
-use futures::future::{self, TryFutureExt};
-use reqwest::Client;
 use slog::{error, info, Logger};
-use std::future::Future;
 use std::time::Duration;
+use ureq::Agent;
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
@@ -26,8 +24,14 @@ pub enum HttpClientError {
     /// The URL is redirected, but we don't know where (response lacked a `Location` header).
     NoLocationHeader(Url),
 
-    /// Error returned by the reqwest crate.
-    ReqwestError(reqwest::Error),
+    /// Error returned by the ureq crate.
+    UreqError(ureq::Error),
+
+    /// Std error returned by the ureq crate.
+    UreqStdError(std::io::Error),
+
+    /// Error parsing a URL with the `url` crate.
+    UrlParseError(url::ParseError),
 }
 
 impl std::fmt::Display for HttpClientError {
@@ -45,7 +49,13 @@ impl std::fmt::Display for HttpClientError {
             HttpClientError::NoLocationHeader(from) => {
                 write!(f, "{} is redirected, but we don't know where as `Location` header was missing or invalid", from)
             }
-            HttpClientError::ReqwestError(err) => write!(f, "reqwest's crate error: {}", err),
+            HttpClientError::UreqError(err) => write!(f, "ureq's crate error: {}", err),
+            HttpClientError::UreqStdError(err) => {
+                write!(f, "ureq's crate produced an std error: {}", err)
+            }
+            HttpClientError::UrlParseError(err) => {
+                write!(f, "error parsing URL: {}", err)
+            }
         }
     }
 }
@@ -57,97 +67,54 @@ impl std::error::Error for HttpClientError {
             HttpClientError::Moving { .. } => None,
             HttpClientError::Moved { .. } => None,
             HttpClientError::NoLocationHeader(_) => None,
-            HttpClientError::ReqwestError(err) => err.source(),
+            HttpClientError::UreqError(err) => err.source(),
+            HttpClientError::UreqStdError(err) => err.source(),
+            HttpClientError::UrlParseError(err) => err.source(),
         }
     }
 }
 
 pub struct HttpClient {
-    inner: Client,
+    logger: Logger,
+    inner: Agent,
     robots_txt: String,
 }
 
 impl HttpClient {
-    pub async fn new(logger: Logger, host: &Host) -> Result<Self, HttpClientError> {
-        // Our redirect policy is:
-        // - follow redirects as long as they point to the same hostname:port, and schema didn't
-        //   change
-        // - stop after 10 redirects
-        let redirect_policy = {
-            let logger = logger.clone();
-            reqwest::redirect::Policy::custom(move |attempt| {
-                // This can't panic because in order to get redirected, we had to request some URL. So
-                // there's at least one previously-visited URL in the array.
-                #[allow(clippy::indexing_slicing)]
-                let previous: &Url = &attempt.previous()[0];
-
-                if attempt.previous().len() > 10 {
-                    error!(logger, "Too many redirects: {:?}", attempt.previous());
-                    attempt.error("too many redirects")
-                } else if !is_same_origin(attempt.url(), previous) {
-                    error!(
-                        logger,
-                        "Redirect points to {} which is of different origin that {}; stopping here",
-                        attempt.url(),
-                        previous
-                    );
-                    attempt.stop()
-                } else {
-                    attempt.follow()
-                }
-            })
-        };
-        let inner = reqwest::ClientBuilder::new()
-            .redirect(redirect_policy)
+    pub fn new(logger: Logger, host: Host) -> Result<Self, HttpClientError> {
+        let inner = ureq::AgentBuilder::new()
+            // We'll handle redirects ourselves
+            .redirects(0)
             .timeout(Duration::from_secs(30))
             .user_agent(USER_AGENT_FULL)
-            .build()
-            .map_err(HttpClientError::ReqwestError)?;
+            .build();
         let robots_txt = {
             let url = format!("https://{}/robots.txt", host);
+            let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
             info!(logger, "Fetching robots.txt");
-            let response = inner
-                .get(url)
-                .timeout(Duration::from_secs(10))
-                .send()
-                .await
-                .map_err(HttpClientError::ReqwestError)?;
-            redirect_into_error(&response)?;
-            response
-                .text()
-                .await
-                .map_err(HttpClientError::ReqwestError)?
+            get_with_type_ignoring_404(&logger, &inner, &url, None)?
+                .into_string()
+                .map_err(HttpClientError::UreqStdError)?
         };
-        Ok(Self { inner, robots_txt })
+        Ok(Self {
+            logger,
+            inner,
+            robots_txt,
+        })
     }
 
-    pub fn get<'a, U: reqwest::IntoUrl + 'a>(
-        &'a self,
-        url: U,
-    ) -> impl Future<Output = Result<reqwest::Response, HttpClientError>> + 'a {
-        async { url.into_url().map_err(HttpClientError::ReqwestError) }
-            .and_then(|url| {
-                if !self.allowed_by_robots_txt(url.as_str()) {
-                    future::err(HttpClientError::ForbiddenByRobotsTxt(url))
-                } else {
-                    future::ok(url)
-                }
-            })
-            .and_then(|url| {
-                self.inner
-                    .get(url)
-                    .header(
-                        reqwest::header::ACCEPT,
-                        reqwest::header::HeaderValue::from_static("application/json"),
-                    )
-                    .timeout(Duration::from_secs(10))
-                    .send()
-                    .map_err(HttpClientError::ReqwestError)
-            })
-            .and_then(|response| async {
-                redirect_into_error(&response)?;
-                Ok(response)
-            })
+    pub fn get(&self, url: &Url) -> Result<ureq::Response, HttpClientError> {
+        if !self.allowed_by_robots_txt(url.as_str()) {
+            return Err(HttpClientError::ForbiddenByRobotsTxt(url.to_owned()));
+        }
+
+        match get_with_type_ignoring_404(&self.logger, &self.inner, url, Some("application/json")) {
+            Ok(r) if r.status() == 404 => {
+                let ureq_err = ureq::Error::Status(404, r);
+                Err(HttpClientError::UreqError(ureq_err))
+            }
+            x => x,
+        }
     }
 
     fn allowed_by_robots_txt(&self, url: &str) -> bool {
@@ -157,39 +124,107 @@ impl HttpClient {
     }
 }
 
-fn redirect_into_error(response: &reqwest::Response) -> Result<(), HttpClientError> {
-    use reqwest::{header::LOCATION, StatusCode};
-
-    match response.status() {
-        StatusCode::FOUND | StatusCode::SEE_OTHER | StatusCode::TEMPORARY_REDIRECT => {
-            let from = response.url().clone();
-
-            let to = response
-                .headers()
-                .get(LOCATION)
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| Url::parse(h).ok())
-                .ok_or_else(|| HttpClientError::NoLocationHeader(from.clone()))?;
-
-            return Err(HttpClientError::Moving { from, to });
+fn get_with_type_ignoring_404(
+    logger: &Logger,
+    agent: &Agent,
+    url: &Url,
+    acceptable_type: Option<&str>,
+) -> Result<ureq::Response, HttpClientError> {
+    // Our redirect policy is:
+    // - follow redirects as long as they point to the same hostname:port, and schema didn't
+    //   change
+    // - stop after 10 redirects
+    const REDIRECTS_LIMIT: u8 = 10;
+    let mut redirects_left = REDIRECTS_LIMIT;
+    let mut current_url = url.to_owned();
+    let mut response;
+    loop {
+        let mut request = agent
+            .get(current_url.as_str())
+            .timeout(Duration::from_secs(10));
+        if let Some(t) = acceptable_type {
+            request = request.set("Accept", t);
         }
 
-        StatusCode::MOVED_PERMANENTLY | StatusCode::PERMANENT_REDIRECT => {
-            let from = response.url().clone();
-
-            let to = response
-                .headers()
-                .get(LOCATION)
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| Url::parse(h).ok())
-                .ok_or_else(|| HttpClientError::NoLocationHeader(from.clone()))?;
-
-            return Err(HttpClientError::Moved { from, to });
+        match request.call() {
+            Ok(r) => response = r,
+            Err(ureq::Error::Status(404, r)) => response = r,
+            Err(e) => return Err(HttpClientError::UreqError(e)),
+        }
+        if !is_redirect(response.status()) {
+            break;
         }
 
-        _ => {}
+        // invariant: response's status is a redirect code
+
+        let to = response
+            .header("location")
+            .and_then(|h| Url::parse(h).ok())
+            .ok_or_else(|| HttpClientError::NoLocationHeader(current_url.clone()))?;
+
+        if !is_same_origin(&to, &current_url) {
+            error!(
+                logger,
+                "Redirect points to {} which is of different origin that {}; stopping here",
+                to,
+                current_url
+            );
+            break;
+        }
+
+        current_url = to;
+
+        redirects_left = redirects_left.saturating_sub(1);
+        if redirects_left == 0 {
+            break;
+        }
     }
-    Ok(())
+    redirect_into_error(url, &response)?;
+    Ok(response)
+}
+
+fn is_temporary_redirect(status: u16) -> bool {
+    const FOUND: u16 = 302;
+    const SEE_OTHER: u16 = 303;
+    const TEMPORARY_REDIRECT: u16 = 307;
+
+    status == FOUND || status == SEE_OTHER || status == TEMPORARY_REDIRECT
+}
+
+fn is_permanent_redirect(status: u16) -> bool {
+    const MOVED_PERMANENTLY: u16 = 301;
+    const PERMANENT_REDIRECT: u16 = 308;
+
+    status == MOVED_PERMANENTLY || status == PERMANENT_REDIRECT
+}
+
+fn is_redirect(status: u16) -> bool {
+    is_temporary_redirect(status) || is_permanent_redirect(status)
+}
+
+fn redirect_into_error(from: &Url, response: &ureq::Response) -> Result<(), HttpClientError> {
+    if !is_redirect(response.status()) {
+        return Ok(());
+    }
+
+    // invariant: `response` is a redirect
+
+    let from = from.to_owned();
+    let to = response
+        .header("location")
+        .and_then(|h| Url::parse(h).ok())
+        .ok_or_else(|| HttpClientError::NoLocationHeader(from.clone()))?;
+
+    if is_temporary_redirect(response.status()) {
+        return Err(HttpClientError::Moving { from, to });
+    } else if is_permanent_redirect(response.status()) {
+        return Err(HttpClientError::Moved { from, to });
+    }
+
+    unreachable!(
+        "The redirect is neither temporary not permanent: status code {}",
+        response.status()
+    )
 }
 
 /// Returns `true` if the URLs have the same schema, domain, and port.
