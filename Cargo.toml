@@ -20,7 +20,7 @@ slog = "2"
 slog-journald = "2"
 url = { version = "2", features = [ "serde" ] }
 libsqlite3-sys = "0.23"
-rusty_pool = "0.6"
+rusty_pool = "0.7"
 signal-hook = "0.3"
 futures = "0.3"
 robotstxt = "0.3"
