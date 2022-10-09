@@ -26,7 +26,7 @@ jobs:
         run: cargo check
 
       - name: "cargo clippy"
-        run: cargo clippy
+        run: cargo clippy --all-features
 
       - name: "cargo build"
         run: cargo build
