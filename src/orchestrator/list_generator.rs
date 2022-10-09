@@ -48,7 +48,8 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
         instances.push(hostname);
     }
 
-    let instances = json::stringify(instances);
+    let instances = serde_json::to_string(&instances)
+        .context(with_loc!("Serializing instances list into JSON"))?;
     write("instances.json", instances.as_bytes()).context(with_loc!("Writing instances.json"))?;
 
     let gzipped_instances = {

@@ -10,7 +10,6 @@ license = " AGPL-3.0-or-later"
 anyhow = "1"
 chrono = "0.4"
 fastrand = "1"
-json = "0.12"
 lexopt = "0.2"
 ureq = { version = "2", features = [ "gzip", "brotli", "json" ] }
 rusqlite = "0.26"

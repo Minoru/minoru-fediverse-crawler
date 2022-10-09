@@ -4,7 +4,7 @@ use crate::{
     checker::http_client::{HttpClient, HttpClientError},
     ipc, with_loc,
 };
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use serde::Deserialize;
 use slog::{error, info, o, Logger};
 use url::{Host, Url};
@@ -132,11 +132,14 @@ fn try_check(logger: &Logger, host: Host) -> anyhow::Result<()> {
 
 fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyhow::Result<String> {
     let nodeinfo = fetch_nodeinfo(logger, client, host).context(with_loc!("Fetching NodeInfo"))?;
-    json::parse(&nodeinfo)
-        .map(|obj| {
-            // Indexing into JsonValue doesn't panic
-            #[allow(clippy::indexing_slicing)]
-            obj["software"]["name"].to_string()
+    serde_json::from_str(&nodeinfo)
+        .map_err(|err| err.into())
+        .and_then(|obj: serde_json::Value| {
+            #[allow(clippy::indexing_slicing)] // Indexing into Value returns Value::Null
+            match &obj["software"]["name"] {
+                serde_json::Value::Null => bail!("No software name in NodeInfo"),
+                name => Ok(name.to_string()),
+            }
         })
         .map_err(|err| {
             let msg = format!(
@@ -306,12 +309,14 @@ fn is_instance_private(client: &HttpClient, host: &Host, software: &str) -> anyh
         "gnusocial" | "friendica" => {
             let config = get_statusnet_config(client, host)
                 .context(with_loc!("Fetching StatusNet config"))?;
-            let config =
-                json::parse(&config).context(with_loc!("Parsing StatusNet config as JSON"))?;
+            let config: serde_json::Value = serde_json::from_str(&config)
+                .context(with_loc!("Parsing StatusNet config as JSON"))?;
 
-            // Indexing into JsonValue doesn't panic
-            #[allow(clippy::indexing_slicing)]
-            let is_private = config["site"]["private"].as_bool().unwrap_or(false);
+            let is_private = config
+                .get("site")
+                .and_then(|site| site.get("private"))
+                .and_then(|private| private.as_bool())
+                .unwrap_or(false);
 
             Ok(is_private)
         }
@@ -319,11 +324,13 @@ fn is_instance_private(client: &HttpClient, host: &Host, software: &str) -> anyh
         "hubzilla" | "red" => {
             let siteinfo =
                 get_siteinfo(client, host).context(with_loc!("Fetching Siteinfo.json"))?;
-            let siteinfo = json::parse(&siteinfo).context(with_loc!("Parsing Siteinfo as JSON"))?;
+            let siteinfo: serde_json::Value =
+                serde_json::from_str(&siteinfo).context(with_loc!("Parsing Siteinfo as JSON"))?;
 
-            // Indexing into JsonValue doesn't panic
-            #[allow(clippy::indexing_slicing)]
-            let hide_in_statistics = siteinfo["hide_in_statistics"].as_bool().unwrap_or(false);
+            let hide_in_statistics = siteinfo
+                .get("hide_in_statistics")
+                .and_then(|hide| hide.as_bool())
+                .unwrap_or(false);
 
             Ok(hide_in_statistics)
         }
