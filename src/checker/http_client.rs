@@ -233,6 +233,7 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
 

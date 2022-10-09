@@ -355,6 +355,7 @@ fn get_siteinfo(client: &HttpClient, host: &Host) -> anyhow::Result<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod test {
     use super::*;
 
