@@ -25,3 +25,6 @@ robotstxt = "0.3"
 tempfile = "3"
 addr = "0.15"
 flate2 = "1"
+
+[profile.release]
+lto = "fat"
