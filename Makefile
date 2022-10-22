@@ -31,6 +31,6 @@ clean:
 	cargo clean
 	rm -f index.html
 
-.PHONY: deploy clean
-
 FORCE:
+
+.PHONY: deploy clean FORCE
