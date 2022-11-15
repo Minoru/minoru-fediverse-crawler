@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use rusqlite::{
     params,
-    types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef},
+    types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
     Connection, ToSql, Transaction,
 };
 
@@ -77,7 +77,7 @@ impl ToSql for UnixTimestamp {
 impl FromSql for UnixTimestamp {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let t = value.as_i64()?;
-        let t = NaiveDateTime::from_timestamp(t, 0);
+        let t = NaiveDateTime::from_timestamp_opt(t, 0).ok_or(FromSqlError::OutOfRange(t))?;
         let t = DateTime::<Utc>::from_utc(t, Utc);
         let t = UnixTimestamp(t);
         Ok(t)
