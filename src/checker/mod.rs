@@ -51,8 +51,8 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
     if let Err(e) = try_check(&logger, host) {
         if let Some(error) = e.downcast_ref::<HttpClientError>() {
             match error {
-                HttpClientError::Moving { to, .. } => {
-                    if let Some(to) = to.host().map(|h| h.to_owned()) {
+                HttpClientError::Moving(redir) => {
+                    if let Some(to) = redir.to.host().map(|h| h.to_owned()) {
                         info!(logger, "Instance is moving to {}", to);
                         let moving = serde_json::to_string(&ipc::CheckerResponse::State {
                             state: ipc::InstanceState::Moving { to },
@@ -62,8 +62,8 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
                     }
                 }
 
-                HttpClientError::Moved { to, .. } => {
-                    if let Some(to) = to.host().map(|h| h.to_owned()) {
+                HttpClientError::Moved(redir) => {
+                    if let Some(to) = redir.to.host().map(|h| h.to_owned()) {
                         info!(logger, "Instance has moved to {}", to);
                         let moved = serde_json::to_string(&ipc::CheckerResponse::State {
                             state: ipc::InstanceState::Moved { to },

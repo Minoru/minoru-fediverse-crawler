@@ -10,22 +10,35 @@ const USER_AGENT_TOKEN: &str = "MinoruFediverseCrawler";
 /// The string to be sent with each HTTP request.
 const USER_AGENT_FULL: &str = "Minoru's Fediverse Crawler (+https://nodes.fediverse.party)";
 
+/// A redirection from one URL to another.
+#[derive(Debug)]
+pub struct Redirection {
+    /// The URL from which we were redirected.
+    pub from: Url,
+
+    /// The URL to which we were redirected.
+    pub to: Url,
+}
+
 #[derive(Debug)]
 pub enum HttpClientError {
     /// The URL couldn't be accessed because the access is forbidden by robots.txt.
     ForbiddenByRobotsTxt(Url),
 
     /// The URL is temporarily redirected to another.
-    Moving { from: Url, to: Url },
+    // The fields are put into a box to avoid clippy::result_large_err warning.
+    Moving(Box<Redirection>),
 
     /// The URL is permanently redirected to another.
-    Moved { from: Url, to: Url },
+    // The fields are put into a box to avoid clippy::result_large_err warning.
+    Moved(Box<Redirection>),
 
     /// The URL is redirected, but we don't know where (response lacked a `Location` header).
     NoLocationHeader(Url),
 
     /// Error returned by the ureq crate.
-    UreqError(ureq::Error),
+    // The fields are put into a box to avoid clippy::result_large_err warning.
+    UreqError(Box<ureq::Error>),
 
     /// Std error returned by the ureq crate.
     UreqStdError(std::io::Error),
@@ -40,11 +53,19 @@ impl std::fmt::Display for HttpClientError {
             HttpClientError::ForbiddenByRobotsTxt(url) => {
                 write!(f, "robots.txt forbids access to {}", url)
             }
-            HttpClientError::Moving { from, to } => {
-                write!(f, "{} is temporarily redirected to {}", from, to)
+            HttpClientError::Moving(redir) => {
+                write!(
+                    f,
+                    "{} is temporarily redirected to {}",
+                    redir.from, redir.to
+                )
             }
-            HttpClientError::Moved { from, to } => {
-                write!(f, "{} is permanently redirected to {}", from, to)
+            HttpClientError::Moved(redir) => {
+                write!(
+                    f,
+                    "{} is permanently redirected to {}",
+                    redir.from, redir.to
+                )
             }
             HttpClientError::NoLocationHeader(from) => {
                 write!(f, "{} is redirected, but we don't know where as `Location` header was missing or invalid", from)
@@ -111,7 +132,7 @@ impl HttpClient {
         match get_with_type_ignoring_404(&self.logger, &self.inner, url, Some("application/json")) {
             Ok(r) if r.status() == 404 => {
                 let ureq_err = ureq::Error::Status(404, r);
-                Err(HttpClientError::UreqError(ureq_err))
+                Err(HttpClientError::UreqError(Box::new(ureq_err)))
             }
             x => x,
         }
@@ -149,7 +170,7 @@ fn get_with_type_ignoring_404(
         match request.call() {
             Ok(r) => response = r,
             Err(ureq::Error::Status(404, r)) => response = r,
-            Err(e) => return Err(HttpClientError::UreqError(e)),
+            Err(e) => return Err(HttpClientError::UreqError(Box::new(e))),
         }
         if !is_redirect(response.status()) {
             break;
@@ -216,9 +237,9 @@ fn redirect_into_error(from: &Url, response: &ureq::Response) -> Result<(), Http
         .ok_or_else(|| HttpClientError::NoLocationHeader(from.clone()))?;
 
     if is_temporary_redirect(response.status()) {
-        return Err(HttpClientError::Moving { from, to });
+        return Err(HttpClientError::Moving(Box::new(Redirection { from, to })));
     } else if is_permanent_redirect(response.status()) {
-        return Err(HttpClientError::Moved { from, to });
+        return Err(HttpClientError::Moved(Box::new(Redirection { from, to })));
     }
 
     unreachable!(
