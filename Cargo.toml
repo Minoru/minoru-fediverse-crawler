@@ -10,7 +10,7 @@ license = " AGPL-3.0-or-later"
 anyhow = { version = "1", default-features = false, features = [ "std" ] }
 chrono = { version = "0.4", default-features = false, features = [ "alloc", "std", "clock" ] }
 fastrand = { version = "1", default-features = false }
-lexopt = { version = "0.2", default-features = false }
+lexopt = { version = "0.3", default-features = false }
 ureq = { version = "2", default-features = false, features = [ "tls", "gzip", "brotli", "json" ] }
 rusqlite = { version = "0.26", default-features = false }
 serde = { version = "1", default-features = false, features = [ "derive" ] }
