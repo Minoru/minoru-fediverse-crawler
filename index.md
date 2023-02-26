@@ -99,11 +99,17 @@ with some jitter, that's why the list is updated more often than the check
 period.
 
 Crawler's user agent string is `Minoru's Fediverse Crawler
-(+https://nodes.fediverse.party)`, and it makes requests from the following IP
+(+https://nodes.fediverse.party)`. It makes requests from the following IP
 addresses:
 
-* 84.22.103.136
-* 2a02:2770:8:0:21a:4aff:fefd:4598
+* 188.72.76.9
+* 2a04:c900:1c00:6::5
+
+Historical addresses, in case you need to grep your logs or something:
+
+- until 20023-02-27:
+    * 84.22.103.136
+    * 2a02:2770:8:0:21a:4aff:fefd:4598
 
 ## Who is responsible for this list?
 
