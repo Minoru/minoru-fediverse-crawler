@@ -44,7 +44,8 @@
 //! still employ randomness though, so when a bunch  of instances are added simultaneously, they
 //! won't all get scheduled onto the same time. The amount of randomness is bigger than with the
 //! other two functions; it's any number of seconds from 0 to 29 hours (both inclusive).
-use anyhow::anyhow;
+use crate::with_loc;
+use anyhow::{anyhow, Context};
 use chrono::prelude::*;
 use chrono::Duration;
 use std::ops::{RangeBounds, RangeInclusive};
@@ -55,7 +56,11 @@ fn now_plus_offset_plus_random_from_range(
     fixed_offset: Duration,
     range: impl RangeBounds<i64>,
 ) -> anyhow::Result<DateTime<Utc>> {
-    let offset = fixed_offset + Duration::seconds(fastrand::i64(range));
+    let offset = fixed_offset
+        .checked_add(&Duration::seconds(fastrand::i64(range)))
+        .context(with_loc!(
+            "Adding random offset from range to given offset and current time"
+        ))?;
     Utc::now().checked_add_signed(offset).ok_or_else(|| {
         anyhow!(
             "Failed to add {} to the current datetime, as it will lead to overflow",

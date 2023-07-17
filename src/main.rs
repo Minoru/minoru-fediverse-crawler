@@ -4,7 +4,7 @@
     clippy::ok_expect,
     clippy::integer_division,
     clippy::indexing_slicing,
-    clippy::integer_arithmetic,
+    clippy::arithmetic_side_effects,
     clippy::panic,
     clippy::match_on_vec_items
 )]
