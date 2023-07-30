@@ -1,4 +1,4 @@
-FROM debian:11
+FROM debian:12
 
 ENV DEBIAN_FRONTEND noninteractive
 
