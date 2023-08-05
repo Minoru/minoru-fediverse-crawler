@@ -32,8 +32,9 @@ SystemCallErrorNumber=EPERM
 ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/var/lib/fedicrawler
-NoExecPaths=/
-ExecPaths=/var/lib/fedicrawler
+# TODO: figure out why those make the crawler non-executable https://github.com/Minoru/minoru-fediverse-crawler/issues/214
+#NoExecPaths=/
+#ExecPaths=/var/lib/fedicrawler
 PrivateDevices=yes
 ProtectKernelTunables=yes
 
