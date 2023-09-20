@@ -78,7 +78,7 @@ impl FromSql for UnixTimestamp {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let t = value.as_i64()?;
         let t = NaiveDateTime::from_timestamp_opt(t, 0).ok_or(FromSqlError::OutOfRange(t))?;
-        let t = DateTime::<Utc>::from_utc(t, Utc);
+        let t = t.and_utc();
         let t = UnixTimestamp(t);
         Ok(t)
     }
