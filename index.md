@@ -107,7 +107,7 @@ addresses:
 
 Historical addresses, in case you need to grep your logs or something:
 
-- until 20023-02-27:
+- until 2023-02-27:
     * 84.22.103.136
     * 2a02:2770:8:0:21a:4aff:fefd:4598
 
