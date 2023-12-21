@@ -27,7 +27,7 @@
       src: "/var/lib/fedicrawler/instances.json"
       dest: "/var/lib/fedicrawler/www/{{ item.name }}"
       state: link
-      # Create it even if the target file doens't exist.
+      # Create it even if the target file doesn't exist.
       force: yes
     with_items:
       - { name: "nodes.json" }
@@ -38,7 +38,7 @@
       src: "/var/lib/fedicrawler/instances.json.gz"
       dest: "/var/lib/fedicrawler/www/{{ item.name }}"
       state: link
-      # Create it even if the target file doens't exist.
+      # Create it even if the target file doesn't exist.
       force: yes
     with_items:
       - { name: "nodes.json.gz" }
