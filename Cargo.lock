@@ -531,7 +531,6 @@ dependencies = [
  "fastrand",
  "flate2",
  "lexopt",
- "libsqlite3-sys",
  "robotstxt",
  "rusqlite",
  "rusty_pool",

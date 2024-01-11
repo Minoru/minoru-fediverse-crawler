@@ -11,11 +11,8 @@ use rusqlite::{
 
 fn is_sqlite_busy_error(error: &anyhow::Error) -> bool {
     if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
-        use libsqlite3_sys::{Error, ErrorCode};
-        use rusqlite::Error::SqliteFailure;
-
-        if let SqliteFailure(Error { code, .. }, _) = error {
-            return *code == ErrorCode::DatabaseBusy;
+        if let Some(code) = error.sqlite_error_code() {
+            return code == rusqlite::ErrorCode::DatabaseBusy;
         }
     }
 
