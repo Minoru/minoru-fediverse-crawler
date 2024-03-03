@@ -12,7 +12,7 @@ chrono = { version = "0.4", default-features = false, features = [ "alloc", "std
 fastrand = { version = "2", default-features = false, features = [ "std" ] }
 lexopt = { version = "0.3", default-features = false }
 ureq = { version = "2", default-features = false, features = [ "tls", "gzip", "brotli", "json" ] }
-rusqlite = { version = "0.30", default-features = false }
+rusqlite = { version = "0.31", default-features = false }
 serde = { version = "1", default-features = false, features = [ "derive" ] }
 serde_json = { version = "1", default-features = false }
 slog = { version = "2", default-features = false }
