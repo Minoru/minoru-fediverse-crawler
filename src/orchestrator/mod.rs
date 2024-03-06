@@ -61,7 +61,9 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         let (instance, check_time) = db::pick_next_instance(&conn)
             .context(with_loc!("Orchestrator picking next instance"))?;
         let wait = check_time.signed_duration_since(chrono::offset::Utc::now());
-        if wait > chrono::Duration::seconds(3) {
+        let three_seconds = chrono::Duration::try_seconds(3)
+            .context(with_loc!("Creating a Duration of three seconds"))?;
+        if wait > three_seconds {
             std::thread::sleep(std::time::Duration::from_secs(3));
             return Ok(());
         }
