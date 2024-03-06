@@ -2,7 +2,7 @@
 
 use crate::{domain::Domain, time, with_loc};
 use anyhow::{anyhow, Context};
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use rusqlite::{
     params,
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
@@ -74,8 +74,7 @@ impl ToSql for UnixTimestamp {
 impl FromSql for UnixTimestamp {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let t = value.as_i64()?;
-        let t = NaiveDateTime::from_timestamp_opt(t, 0).ok_or(FromSqlError::OutOfRange(t))?;
-        let t = t.and_utc();
+        let t = DateTime::from_timestamp(t, 0).ok_or(FromSqlError::OutOfRange(t))?;
         let t = UnixTimestamp(t);
         Ok(t)
     }
@@ -399,8 +398,10 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
                     },
                 )
                 .context(with_loc!("Selecting data from 'dying_state_data'"))?;
+            let one_week =
+                Duration::try_weeks(1).context(with_loc!("Creating a Duration of one week"))?;
             let week_ago = now
-                .checked_sub_signed(Duration::weeks(1))
+                .checked_sub_signed(one_week)
                 .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
             // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
             // "daily" checks per peal week. So 6 failed checks means "we've been failing for about
@@ -556,8 +557,10 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
                         },
                     )
                     .context(with_loc!("Getting data from 'moving_state_data'"))?;
+                let one_week =
+                    Duration::try_weeks(1).context(with_loc!("Creating a Duration of one week"))?;
                 let week_ago = now
-                    .checked_sub_signed(Duration::weeks(1))
+                    .checked_sub_signed(one_week)
                     .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
                 // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
                 // "daily" checks per peal week. So 6 redirects mean "we've been redirected for

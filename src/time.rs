@@ -56,8 +56,11 @@ fn now_plus_offset_plus_random_from_range(
     fixed_offset: Duration,
     range: impl RangeBounds<i64>,
 ) -> anyhow::Result<DateTime<Utc>> {
+    let random_offset = fastrand::i64(range);
+    let random_offset_duration = Duration::try_seconds(random_offset)
+        .ok_or_else(|| anyhow!("Can't represent {} seconds with a Duration", random_offset))?;
     let offset = fixed_offset
-        .checked_add(&Duration::seconds(fastrand::i64(range)))
+        .checked_add(&random_offset_duration)
         .context(with_loc!(
             "Adding random offset from range to given offset and current time"
         ))?;
@@ -73,7 +76,9 @@ fn now_plus_offset_plus_random_from_range(
 pub fn about_a_day_from_now() -> anyhow::Result<DateTime<Utc>> {
     const TWO_HOURS_SECS: i64 = 2 * 60 * 60;
     const RAND_RANGE: RangeInclusive<i64> = -TWO_HOURS_SECS..=TWO_HOURS_SECS;
-    now_plus_offset_plus_random_from_range(Duration::hours(DAY_HOURS), RAND_RANGE)
+    let starting_point = Duration::try_hours(DAY_HOURS)
+        .ok_or_else(|| anyhow!("Creating Duration of {} hours", DAY_HOURS))?;
+    now_plus_offset_plus_random_from_range(starting_point, RAND_RANGE)
 }
 
 /// Random datetime about a week away from now (now + 167 hours ± 11.5 hours).
@@ -81,7 +86,10 @@ pub fn about_a_week_from_now() -> anyhow::Result<DateTime<Utc>> {
     const ELEVEN_AND_A_HALF_HOURS_SECS: i64 = (11 * 60 + 30) * 60;
     const RAND_RANGE: RangeInclusive<i64> =
         -ELEVEN_AND_A_HALF_HOURS_SECS..=ELEVEN_AND_A_HALF_HOURS_SECS;
-    now_plus_offset_plus_random_from_range(Duration::hours(167), RAND_RANGE)
+    let hours = 167;
+    let starting_point = Duration::try_hours(hours)
+        .ok_or_else(|| anyhow!("Creating Duration of {} hours", hours))?;
+    now_plus_offset_plus_random_from_range(starting_point, RAND_RANGE)
 }
 
 /// Random datetime no further than 29 hours from now.
@@ -94,9 +102,13 @@ pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
 pub fn in_about_six_hours() -> anyhow::Result<DateTime<Utc>> {
     const FIVE_MINUTES_SECS: i64 = 5 * 60;
     const SIX_HOURS_SIX_MINUTES_MINS: i64 = 6 * 60 + 6;
+    let six_hours_six_minutes_mins =
+        Duration::try_minutes(SIX_HOURS_SIX_MINUTES_MINS).ok_or_else(|| {
+            anyhow!(
+                "Creating Duration of {} minutes",
+                SIX_HOURS_SIX_MINUTES_MINS
+            )
+        })?;
     const RAND_RANGE: RangeInclusive<i64> = -FIVE_MINUTES_SECS..=FIVE_MINUTES_SECS;
-    now_plus_offset_plus_random_from_range(
-        Duration::minutes(SIX_HOURS_SIX_MINUTES_MINS),
-        RAND_RANGE,
-    )
+    now_plus_offset_plus_random_from_range(six_hours_six_minutes_mins, RAND_RANGE)
 }
