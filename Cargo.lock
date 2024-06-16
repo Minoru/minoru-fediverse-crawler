@@ -626,9 +626,9 @@ checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "memchr"
-version = "2.7.2"
+version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
+checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
 name = "memoffset"
@@ -750,9 +750,9 @@ dependencies = [
 
 [[package]]
 name = "psl"
-version = "2.1.42"
+version = "2.1.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71cad2f472a847f48e9b6d4712238b77ce586801c4b1702dc6c026290b25c6ff"
+checksum = "bac2a3a4c4b39bd07eccfb97bacc286859b7b1440e5e56fb9969beaace0ae308"
 dependencies = [
  "psl-types",
 ]
