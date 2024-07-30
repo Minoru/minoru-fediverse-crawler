@@ -45,7 +45,6 @@
 //! won't all get scheduled onto the same time. The amount of randomness is bigger than with the
 //! other two functions; it's any number of seconds from 0 to 29 hours (both inclusive).
 use anyhow::anyhow;
-use chrono::{DateTime, Utc};
 use std::ops::{RangeBounds, RangeInclusive};
 use std::time::{Duration, SystemTime};
 
@@ -54,7 +53,7 @@ const DAY_HOURS_IN_SECONDS: u64 = 29 * 3600;
 fn now_plus_offset_plus_random_from_range(
     fixed_offset: Duration,
     range: impl RangeBounds<i64>,
-) -> anyhow::Result<DateTime<Utc>> {
+) -> anyhow::Result<SystemTime> {
     let random_offset = fastrand::i64(range);
 
     let final_offset_seconds = fixed_offset
@@ -76,14 +75,11 @@ fn now_plus_offset_plus_random_from_range(
         )
     })?;
 
-    // Convert SystemTime to chrono::DateTime<Utc>
-    let datetime: DateTime<Utc> = final_time.into();
-
-    Ok(datetime)
+    Ok(final_time)
 }
 
 /// Random datetime about a day from now (now + 29 hours ± 2 hours).
-pub fn about_a_day_from_now() -> anyhow::Result<DateTime<Utc>> {
+pub fn about_a_day_from_now() -> anyhow::Result<SystemTime> {
     const TWO_HOURS_SECS: i64 = 2 * 60 * 60;
     const RAND_RANGE: RangeInclusive<i64> = -TWO_HOURS_SECS..=TWO_HOURS_SECS;
     let starting_point = Duration::from_secs(DAY_HOURS_IN_SECONDS);
@@ -91,7 +87,7 @@ pub fn about_a_day_from_now() -> anyhow::Result<DateTime<Utc>> {
 }
 
 /// Random datetime about a week away from now (now + 167 hours ± 11.5 hours).
-pub fn about_a_week_from_now() -> anyhow::Result<DateTime<Utc>> {
+pub fn about_a_week_from_now() -> anyhow::Result<SystemTime> {
     const ELEVEN_AND_A_HALF_HOURS_SECS: i64 = (11 * 60 + 30) * 60;
     const RAND_RANGE: RangeInclusive<i64> =
         -ELEVEN_AND_A_HALF_HOURS_SECS..=ELEVEN_AND_A_HALF_HOURS_SECS;
@@ -101,7 +97,7 @@ pub fn about_a_week_from_now() -> anyhow::Result<DateTime<Utc>> {
 }
 
 /// Random datetime no further than 29 hours from now.
-pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
+pub fn sometime_today() -> anyhow::Result<SystemTime> {
     now_plus_offset_plus_random_from_range(
         Duration::from_secs(0),
         0..=(DAY_HOURS_IN_SECONDS as i64),
@@ -109,7 +105,7 @@ pub fn sometime_today() -> anyhow::Result<DateTime<Utc>> {
 }
 
 /// Random datetime about 6.1 hours from now (now + 6 hours 6 minutes ± 5 minutes).
-pub fn in_about_six_hours() -> anyhow::Result<DateTime<Utc>> {
+pub fn in_about_six_hours() -> anyhow::Result<SystemTime> {
     const FIVE_MINUTES_SECS: i64 = 5 * 60;
     const SIX_HOURS_SIX_MINUTES_SECS: u64 = (6 * 60 + 6) * 60;
     let six_hours_six_minutes_duration = Duration::from_secs(SIX_HOURS_SIX_MINUTES_SECS);
