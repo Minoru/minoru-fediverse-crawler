@@ -2,12 +2,14 @@
 
 use crate::{domain::Domain, time, with_loc};
 use anyhow::{anyhow, Context};
-use chrono::{DateTime, Duration, Utc};
 use rusqlite::{
     params,
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
     Connection, ToSql, Transaction,
 };
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+const ONE_WEEK_IN_SECONDS: u64 = 60 * 60 * 24 * 7;
 
 fn is_sqlite_busy_error(error: &anyhow::Error) -> bool {
     if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
@@ -61,22 +63,29 @@ where
     f()
 }
 
-/// Wrapper over `chrono::DateTime<Utc>`. In SQL, it's stored as an integer number of seconds since
+/// Wrapper over `std::time::SystemTime`. In SQL, it's stored as an integer number of seconds since
 /// January 1, 1970.
-struct UnixTimestamp(DateTime<Utc>);
+struct UnixTimestamp(SystemTime);
 
 impl ToSql for UnixTimestamp {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(self.0.timestamp()))
+        let duration_since_epoch = self.0.duration_since(UNIX_EPOCH)
+            .map_err(|e| FromSqlError::OutOfRange(e.duration().as_secs() as i64))?;
+        Ok(ToSqlOutput::from(duration_since_epoch.as_secs() as i64))
     }
 }
 
 impl FromSql for UnixTimestamp {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let t = value.as_i64()?;
-        let t = DateTime::from_timestamp(t, 0).ok_or(FromSqlError::OutOfRange(t))?;
-        let t = UnixTimestamp(t);
-        Ok(t)
+        let t = if t >= 0 {
+            UNIX_EPOCH.checked_add(Duration::from_secs(t as u64))
+                .ok_or_else(|| FromSqlError::OutOfRange(t))?
+        } else {
+            UNIX_EPOCH.checked_sub(Duration::from_secs(t.unsigned_abs()))
+                .ok_or_else(|| FromSqlError::OutOfRange(t))?
+        };
+        Ok(UnixTimestamp(t))
     }
 }
 
@@ -339,7 +348,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let now = Utc::now();
+    let now = SystemTime::now();
     let (instance_id, state) =
         get_instance(&tx, instance).context(with_loc!("Getting instance id and state"))?;
     if state == InstanceState::Dead {
@@ -385,7 +394,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
             )
             .context(with_loc!("Updating table 'dying_state_data'"))?;
 
-            let (checks_count, since): (u64, DateTime<Utc>) = tx
+            let (checks_count, since): (u64, SystemTime) = tx
                 .query_row(
                     "SELECT failed_checks_count, dying_since
                     FROM dying_state_data
@@ -398,10 +407,9 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
                     },
                 )
                 .context(with_loc!("Selecting data from 'dying_state_data'"))?;
-            let one_week =
-                Duration::try_weeks(1).context(with_loc!("Creating a Duration of one week"))?;
+            let one_week = Duration::from_secs(ONE_WEEK_IN_SECONDS);
             let week_ago = now
-                .checked_sub_signed(one_week)
+                .checked_sub(one_week)
                 .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
             // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
             // "daily" checks per peal week. So 6 failed checks means "we've been failing for about
@@ -462,7 +470,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
         .transaction()
         .context(with_loc!("Beginning a transaction"))?;
 
-    let now = Utc::now();
+    let now = SystemTime::now();
     let (instance_id, state) =
         get_instance(&tx, instance).context(with_loc!("Getting instance id and state"))?;
     if state == InstanceState::Moved {
@@ -544,7 +552,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
                 .context(with_loc!("Updating table 'moving_state_data'"))?;
 
                 // If the instance is in "moving" state for over a week, consider it moved
-                let (redirects_count, since): (u64, DateTime<Utc>) = tx
+                let (redirects_count, since): (u64, SystemTime) = tx
                     .query_row(
                         "SELECT redirects_count, moving_since
                         FROM moving_state_data
@@ -557,10 +565,9 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
                         },
                     )
                     .context(with_loc!("Getting data from 'moving_state_data'"))?;
-                let one_week =
-                    Duration::try_weeks(1).context(with_loc!("Creating a Duration of one week"))?;
+                let one_week = Duration::from_secs(ONE_WEEK_IN_SECONDS);
                 let week_ago = now
-                    .checked_sub_signed(one_week)
+                    .checked_sub(one_week)
                     .ok_or_else(|| anyhow!("Couldn't subtract a week from today's datetime"))?;
                 // "Daily" checks are run every 29 hours; 1 week = 7 days = 168 hours, that's 5.8
                 // "daily" checks per peal week. So 6 redirects mean "we've been redirected for
@@ -696,7 +703,7 @@ fn delete_moved_state_data(tx: &Transaction, id: i64) -> anyhow::Result<()> {
 fn reschedule_instance_to(
     tx: &Transaction,
     id: i64,
-    next_check_datetime: DateTime<Utc>,
+    next_check_datetime: SystemTime,
 ) -> anyhow::Result<()> {
     tx.execute(
         "UPDATE instances
@@ -720,8 +727,8 @@ fn set_instance_state(tx: &Transaction, id: i64, state: InstanceState) -> anyhow
 }
 
 /// Pick the next instance to check, i.e. the one with the smallest `next_check_datetime` value.
-pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Domain, DateTime<Utc>)> {
-    let (hostname, next_check_datetime): (String, DateTime<Utc>) = conn
+pub fn pick_next_instance(conn: &Connection) -> anyhow::Result<(Domain, SystemTime)> {
+    let (hostname, next_check_datetime): (String, SystemTime) = conn
         .query_row(
             "SELECT hostname, next_check_datetime
             FROM instances
