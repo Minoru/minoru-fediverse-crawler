@@ -53,24 +53,32 @@ const DAY_HOURS_IN_SECONDS: u64 = 29 * 3600;
 fn now_plus_offset_plus_random_from_range(
     fixed_offset: Duration,
     range: impl RangeBounds<i64>,
-) -> anyhow::Result<SystemTime> {
+) -> Result<SystemTime> {
     let random_offset = fastrand::i64(range);
 
-    let final_offset_seconds = fixed_offset
-        .as_secs()
-        .checked_add(random_offset.unsigned_abs())
-        .ok_or_else(|| anyhow!("Failed to add random offset from range to given offset"))?;
+    // Convert fixed_offset to seconds and add the random offset
+    let final_offset_seconds = if random_offset >= 0 {
+        fixed_offset
+            .as_secs()
+            .checked_add(random_offset as u64)
+            .ok_or_else(|| anyhow!("Failed to add random offset to given offset"))?
+    } else {
+        // Add negative random_offset to fixed_offset (effectively subtracting it)
+        let random_offset_abs = random_offset.unsigned_abs();
+        if fixed_offset.as_secs() >= random_offset_abs {
+            fixed_offset.as_secs() - random_offset_abs
+        } else {
+            return Err(anyhow!(
+                "Failed to subtract random offset from fixed offset due to underflow"
+            ));
+        }
+    };
 
     let now = SystemTime::now();
 
-    let final_time = if random_offset >= 0 {
-        now.checked_add(Duration::from_secs(final_offset_seconds))
-    } else {
-        now.checked_sub(Duration::from_secs(final_offset_seconds))
-    }
-    .ok_or_else(|| {
+    let final_time = now.checked_add(Duration::from_secs(final_offset_seconds)).ok_or_else(|| {
         anyhow!(
-            "Failed to add/subtract {} seconds to/from the current time, as it will lead to overflow",
+            "Failed to adjust {} seconds to the current time, as it will lead to overflow",
             random_offset
         )
     })?;
