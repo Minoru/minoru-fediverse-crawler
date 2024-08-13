@@ -69,7 +69,9 @@ struct UnixTimestamp(SystemTime);
 
 impl ToSql for UnixTimestamp {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        let duration_since_epoch = self.0.duration_since(UNIX_EPOCH)
+        let duration_since_epoch = self
+            .0
+            .duration_since(UNIX_EPOCH)
             .map_err(|e| FromSqlError::OutOfRange(e.duration().as_secs() as i64))?;
         Ok(ToSqlOutput::from(duration_since_epoch.as_secs() as i64))
     }
@@ -79,10 +81,12 @@ impl FromSql for UnixTimestamp {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         let t = value.as_i64()?;
         let t = if t >= 0 {
-            UNIX_EPOCH.checked_add(Duration::from_secs(t as u64))
+            UNIX_EPOCH
+                .checked_add(Duration::from_secs(t as u64))
                 .ok_or_else(|| FromSqlError::OutOfRange(t))?
         } else {
-            UNIX_EPOCH.checked_sub(Duration::from_secs(t.unsigned_abs()))
+            UNIX_EPOCH
+                .checked_sub(Duration::from_secs(t.unsigned_abs()))
                 .ok_or_else(|| FromSqlError::OutOfRange(t))?
         };
         Ok(UnixTimestamp(t))
