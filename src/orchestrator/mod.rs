@@ -5,6 +5,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::time::{Duration, SystemTime};
 
 mod instance_checker;
 mod list_generator;
@@ -35,10 +36,10 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
     signal_hook::flag::register(signal_hook::consts::SIGTERM, terminate.clone())
         .context(with_loc!("Setting up a SIGTERM hook"))?;
 
-    let mut time_to_generate_a_list = chrono::offset::Utc::now();
+    let mut time_to_generate_a_list = SystemTime::now();
 
     let mut iteration = || -> anyhow::Result<()> {
-        if time_to_generate_a_list < chrono::offset::Utc::now() {
+        if time_to_generate_a_list < SystemTime::now() {
             let logger = logger.new(o!("list_generation" => "true"));
             pool.execute(move || {
                 let task = {
@@ -60,15 +61,14 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
 
         let (instance, check_time) = db::pick_next_instance(&conn)
             .context(with_loc!("Orchestrator picking next instance"))?;
-        let wait = check_time.signed_duration_since(chrono::offset::Utc::now());
-        let three_seconds = chrono::Duration::try_seconds(3)
-            .context(with_loc!("Creating a Duration of three seconds"))?;
+        let wait = check_time.duration_since(SystemTime::now())?;
+        let three_seconds = Duration::from_secs(3);
         if wait > three_seconds {
             std::thread::sleep(std::time::Duration::from_secs(3));
             return Ok(());
         }
-        if wait > chrono::Duration::zero() {
-            std::thread::sleep(wait.to_std()?);
+        if wait > Duration::from_secs(0) {
+            std::thread::sleep(wait);
         }
         db::reschedule(&mut conn, &instance)
             .context(with_loc!("Orchestrator rescheduling an instance"))?;
