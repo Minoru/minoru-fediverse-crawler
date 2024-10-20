@@ -22,7 +22,7 @@ RUN wget -O $HOME/rustup.sh --secure-protocol=TLSv1_3 https://sh.rustup.rs \
     && chmod +x $HOME/rustup.sh \
     && $HOME/rustup.sh -y \
         --default-host x86_64-unknown-linux-gnu \
-        --default-toolchain 1.81.0 \
+        --default-toolchain 1.82.0 \
     && chmod a+w $HOME/.cargo
 
 ENV PATH $HOME/.cargo/bin:$PATH
