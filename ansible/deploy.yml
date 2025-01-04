@@ -102,6 +102,21 @@
       state: started
       enabled: yes
 
+  - name: "Wait 10 seconds for the systemd service to start."
+    ansible.builtin.wait_for:
+      timeout: 10
+
+  - name: Get systemd service status.
+    become: yes
+    service:
+      name: minoru-fediverse-crawler
+    register: service_status
+
+  - name: Ensure systemd service is running.
+    assert:
+      that:
+        - service_status.status.ActiveState == "active"
+
   - name: Ensure jq is installed (for scripts).
     apt:
       name: jq
