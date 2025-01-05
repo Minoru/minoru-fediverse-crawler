@@ -61,7 +61,8 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
 
         let (instance, check_time) = db::pick_next_instance(&conn)
             .context(with_loc!("Orchestrator picking next instance"))?;
-        let wait = check_time.duration_since(SystemTime::now())
+        let wait = check_time
+            .duration_since(SystemTime::now())
             // If `check_time` has already passed, wait a bit and do the check. The small wait is
             // there to ensure that the crawler doesn't fire off many checks at once, potentially
             // overloading hosted offerings like mas.to.
