@@ -14,12 +14,14 @@ pagetitle: Fediverse nodes list
 
 To **help keep track of Fediverse's growth** (or stagnation T_T).
 
-[The-federation.info][the-federation], [FediDB.org][fedidb],
-[Fediverse.Observer][fediverse.observer] and other public hubs provide some
-numbers, but most of them don't automatically discover new servers; the only
-exception is fediverse.observer. As known instances slowly disappear, these hubs
-can give an impression that Fediverse is shrinking. This crawler discovers new
-nodes so hubs don't have to.
+[The-federation.info][the-federation] only checks the instances that were added
+manually. (They recently started working on a crawler, so that might change.)
+[FediDB.org][fedidb] has a non-recursive crawler that fetches new peers from
+a few source instances. [Fediverse.Observer][fediverse.observer] seem to have
+a recursive crawler. This fragmentation leads to hubs seeing a different picture
+of the Fediverse, which leads to difference in their stats. I couldn't see
+a better way to help than to create my own crawler with a sole purpose of
+discovering the instances.
 
 [the-federation]: https://the-federation.info "the federation — a statistics hub"
 [fedidb]: https://fedidb.org "FediDB — Developer Tools for ActivityPub"
