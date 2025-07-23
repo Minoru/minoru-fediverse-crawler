@@ -51,7 +51,7 @@ impl std::fmt::Display for HttpClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HttpClientError::ForbiddenByRobotsTxt(url) => {
-                write!(f, "robots.txt forbids access to {}", url)
+                write!(f, "robots.txt forbids access to {url}")
             }
             HttpClientError::Moving(redir) => {
                 write!(
@@ -68,14 +68,14 @@ impl std::fmt::Display for HttpClientError {
                 )
             }
             HttpClientError::NoLocationHeader(from) => {
-                write!(f, "{} is redirected, but we don't know where as `Location` header was missing or invalid", from)
+                write!(f, "{from} is redirected, but we don't know where as `Location` header was missing or invalid")
             }
-            HttpClientError::UreqError(err) => write!(f, "ureq's crate error: {}", err),
+            HttpClientError::UreqError(err) => write!(f, "ureq's crate error: {err}"),
             HttpClientError::UreqStdError(err) => {
-                write!(f, "ureq's crate produced an std error: {}", err)
+                write!(f, "ureq's crate produced an std error: {err}")
             }
             HttpClientError::UrlParseError(err) => {
-                write!(f, "error parsing URL: {}", err)
+                write!(f, "error parsing URL: {err}")
             }
         }
     }
@@ -110,7 +110,7 @@ impl HttpClient {
             .user_agent(USER_AGENT_FULL)
             .build();
         let robots_txt = {
-            let url = format!("https://{}/robots.txt", host);
+            let url = format!("https://{host}/robots.txt");
             let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
             info!(logger, "Fetching robots.txt");
             get_with_type_ignoring_404(&logger, &inner, &url, None)?

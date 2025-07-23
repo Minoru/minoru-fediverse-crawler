@@ -14,12 +14,10 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         let domain = domain?;
         let domain = match Domain::from_str(&domain) {
             Err(e) => {
-                let msg = format!(
-                    "Couldn't manually add {}, it's not a valid domain name: {}",
-                    domain, e
-                );
+                let msg =
+                    format!("Couldn't manually add {domain}, it's not a valid domain name: {e}");
                 error!(logger, "{}", msg);
-                println!("{}", msg);
+                println!("{msg}");
                 continue;
             }
 
@@ -27,13 +25,13 @@ pub fn main(logger: Logger) -> anyhow::Result<()> {
         };
         match db::on_sqlite_busy_retry_indefinitely(&mut || db::add_instance(&conn, &domain)) {
             Err(e) => {
-                let msg = format!("Failed to add {} to the database: {}", domain, e);
+                let msg = format!("Failed to add {domain} to the database: {e}");
                 error!(logger, "{}", msg);
-                println!("{}", msg);
+                println!("{msg}");
             }
 
             Ok(_) => {
-                let msg = format!("Manually added {} to the database", domain);
+                let msg = format!("Manually added {domain} to the database");
                 info!(logger, "{}", msg);
             }
         }

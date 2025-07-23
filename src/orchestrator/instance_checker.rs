@@ -8,7 +8,7 @@ use std::process::{Child, Command, Stdio};
 
 pub fn run(logger: Logger, instance: Domain) -> anyhow::Result<()> {
     let mut conn = db::open()?;
-    println!("Checking {}", instance);
+    println!("Checking {instance}");
 
     let mut checker = CheckerHandle::new(logger.clone(), instance.clone())?;
     process_checker_response(&logger, &mut conn, &instance, &mut checker.inner)?;
@@ -114,11 +114,10 @@ fn process_checker_response(
             }
             ipc::InstanceState::Moving { to } => {
                 let msg = format!(
-                    "{} is moving to {}. This is a temporary redirect, so marking as dead",
-                    target, to
+                    "{target} is moving to {to}. This is a temporary redirect, so marking as dead"
                 );
                 info!(logger, "{}", msg);
-                println!("{}", msg);
+                println!("{msg}");
 
                 db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
             }
@@ -126,25 +125,24 @@ fn process_checker_response(
                 match Domain::from_host(&to) {
                     Ok(to) => {
                         if &to == target {
-                            let msg = format!("{} has moved to *itself*, marking as dead", target);
+                            let msg = format!("{target} has moved to *itself*, marking as dead");
                             info!(logger, "{}", msg);
-                            println!("{}", msg);
+                            println!("{msg}");
                             db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
                         } else {
-                            let msg = format!("{} has moved to {}", target, to);
+                            let msg = format!("{target} has moved to {to}");
                             info!(logger, "{}", msg);
-                            println!("{}", msg);
+                            println!("{msg}");
                             db::on_sqlite_busy_retry(&mut || db::mark_moved(conn, target, &to))?;
                         }
                     }
 
                     Err(e) => {
                         let msg = format!(
-                            "{} has moved to {}, which is not a valid domain name ({}); marking as dead",
-                            target, to, e
+                            "{target} has moved to {to}, which is not a valid domain name ({e}); marking as dead"
                         );
                         info!(logger, "{}", msg);
-                        println!("{}", msg);
+                        println!("{msg}");
                         db::on_sqlite_busy_retry(&mut || db::mark_dead(conn, target))?;
                     }
                 };
@@ -187,10 +185,10 @@ fn process_peers(
 
     let msg = match peers_count {
         None => format!("{} has more than {} peers", target, u64::MAX),
-        Some(count) => format!("{} has {} peers", target, count),
+        Some(count) => format!("{target} has {count} peers"),
     };
     info!(logger, "{}", msg);
-    println!("{}", msg);
+    println!("{msg}");
 
     Ok(())
 }

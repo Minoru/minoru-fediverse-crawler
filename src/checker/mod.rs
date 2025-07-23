@@ -58,7 +58,7 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
                             state: ipc::InstanceState::Moving { to },
                         })
                         .context(with_loc!("Serializing Moving message"))?;
-                        println!("{}", moving);
+                        println!("{moving}");
                     }
                 }
 
@@ -69,7 +69,7 @@ pub fn main(logger: Logger, host: Host) -> anyhow::Result<()> {
                             state: ipc::InstanceState::Moved { to },
                         })
                         .context(with_loc!("Serializing Moved message"))?;
-                        println!("{}", moved);
+                        println!("{moved}");
                     }
                 }
 
@@ -116,7 +116,7 @@ fn try_check(logger: &Logger, host: Host) -> anyhow::Result<()> {
     })
     .context(with_loc!("Serializing Alive message"))?;
     info!(logger, "The instance is alive");
-    println!("{}", alive);
+    println!("{alive}");
 
     let peers = get_peers(logger, &client, &host, &software)
         .context(with_loc!("Fetching instance's peers list"))?;
@@ -124,7 +124,7 @@ fn try_check(logger: &Logger, host: Host) -> anyhow::Result<()> {
     for instance in peers {
         let peer = serde_json::to_string(&ipc::CheckerResponse::Peer { peer: instance })
             .context(with_loc!("Serializing Peer message"))?;
-        println!("{}", peer);
+        println!("{peer}");
     }
 
     Ok(())
@@ -143,8 +143,7 @@ fn get_software(logger: &Logger, client: &HttpClient, host: &Host) -> anyhow::Re
         })
         .map_err(|err| {
             let msg = format!(
-                "Failed to figure out the software name from the NodeInfo {}: {}",
-                nodeinfo, err
+                "Failed to figure out the software name from the NodeInfo {nodeinfo}: {err}"
             );
             error!(logger, "{}", &msg; "json_error" => err.to_string());
             anyhow!(msg)
@@ -194,7 +193,7 @@ fn fetch_nodeinfo_pointer(
     client: &HttpClient,
     host: &Host,
 ) -> anyhow::Result<NodeInfoPointer> {
-    let url = format!("https://{}/.well-known/nodeinfo", host);
+    let url = format!("https://{host}/.well-known/nodeinfo");
     let url = Url::parse(&url).context(with_loc!(
         "Formatting URL of the well-known NodeInfo document"
     ))?;
@@ -282,7 +281,7 @@ fn get_peers_mastodonish(
     client: &HttpClient,
     host: &Host,
 ) -> anyhow::Result<Vec<Host>> {
-    let url = format!("https://{}/api/v1/instance/peers", host);
+    let url = format!("https://{host}/api/v1/instance/peers");
     let url = Url::parse(&url).context(with_loc!(
         "Formatting URL of the Mastodon-ish 'peers' endpoint"
     ))?;
@@ -340,7 +339,7 @@ fn is_instance_private(client: &HttpClient, host: &Host, software: &str) -> anyh
 }
 
 fn get_statusnet_config(client: &HttpClient, host: &Host) -> anyhow::Result<String> {
-    let url = format!("https://{}/api/statusnet/config.json", host);
+    let url = format!("https://{host}/api/statusnet/config.json");
     let url = Url::parse(&url).context(with_loc!("Formatting URL StatusNet config"))?;
     let response = client
         .get(&url)
@@ -351,7 +350,7 @@ fn get_statusnet_config(client: &HttpClient, host: &Host) -> anyhow::Result<Stri
 }
 
 fn get_siteinfo(client: &HttpClient, host: &Host) -> anyhow::Result<String> {
-    let url = format!("https://{}/siteinfo.json", host);
+    let url = format!("https://{host}/siteinfo.json");
     let url = Url::parse(&url).context(with_loc!("Formatting URL of siteinfo document"))?;
     let response = client
         .get(&url)
