@@ -5,8 +5,7 @@
     clippy::integer_division,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
-    clippy::panic,
-    clippy::match_on_vec_items
+    clippy::panic
 )]
 
 use anyhow::{anyhow, bail};
