@@ -172,13 +172,13 @@ fn process_peers(
                 bail!("Expected the checker to respond with Peer, but it responded with State")
             }
             ipc::CheckerResponse::Peer { peer } => {
-                if let Err(e) = Domain::from_host(&peer).and_then(|peer| {
+                match Domain::from_host(&peer).and_then(|peer| {
                     db::on_sqlite_busy_retry(&mut || db::add_instance(conn, &peer))
-                }) {
+                }) { Err(e) => {
                     info!(logger, "Failed to add {} to the database: {:?}", peer, e);
-                } else {
+                } _ => {
                     peers_count = peers_count.and_then(|x| x.checked_add(1));
-                }
+                }}
             }
         }
     }
