@@ -9,7 +9,7 @@
 )]
 
 use anyhow::{anyhow, bail};
-use slog::{error, o, Drain, Logger};
+use slog::{Drain, Logger, error, o};
 use url::Host;
 
 mod checker;

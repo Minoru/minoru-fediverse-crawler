@@ -1,7 +1,7 @@
 use crate::{domain::Domain, ipc, orchestrator::db, with_loc};
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use rusqlite::Connection;
-use slog::{error, info, Logger};
+use slog::{Logger, error, info};
 use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
@@ -174,11 +174,14 @@ fn process_peers(
             ipc::CheckerResponse::Peer { peer } => {
                 match Domain::from_host(&peer).and_then(|peer| {
                     db::on_sqlite_busy_retry(&mut || db::add_instance(conn, &peer))
-                }) { Err(e) => {
-                    info!(logger, "Failed to add {} to the database: {:?}", peer, e);
-                } _ => {
-                    peers_count = peers_count.and_then(|x| x.checked_add(1));
-                }}
+                }) {
+                    Err(e) => {
+                        info!(logger, "Failed to add {} to the database: {:?}", peer, e);
+                    }
+                    _ => {
+                        peers_count = peers_count.and_then(|x| x.checked_add(1));
+                    }
+                }
             }
         }
     }

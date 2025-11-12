@@ -1,7 +1,7 @@
 //! Produce a JSON list of alive instances.
 use crate::{db, with_loc};
 use anyhow::Context;
-use slog::{info, Logger};
+use slog::{Logger, info};
 use std::io::Write;
 
 /// Writes a JSON array of alive instances into _instances.json_.
@@ -53,7 +53,7 @@ pub fn generate(logger: Logger) -> anyhow::Result<()> {
     write("instances.json", instances.as_bytes()).context(with_loc!("Writing instances.json"))?;
 
     let gzipped_instances = {
-        use flate2::{write::GzEncoder, Compression};
+        use flate2::{Compression, write::GzEncoder};
 
         let mut e = GzEncoder::new(Vec::new(), Compression::best());
         e.write_all(instances.as_bytes())

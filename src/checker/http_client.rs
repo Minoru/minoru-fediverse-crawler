@@ -1,5 +1,5 @@
 //! HTTP client that automatically checks requests against robots.txt.
-use slog::{error, info, Logger};
+use slog::{Logger, error, info};
 use std::time::Duration;
 use ureq::Agent;
 use url::{Host, Url};
@@ -68,7 +68,10 @@ impl std::fmt::Display for HttpClientError {
                 )
             }
             HttpClientError::NoLocationHeader(from) => {
-                write!(f, "{from} is redirected, but we don't know where as `Location` header was missing or invalid")
+                write!(
+                    f,
+                    "{from} is redirected, but we don't know where as `Location` header was missing or invalid"
+                )
             }
             HttpClientError::UreqError(err) => write!(f, "ureq's crate error: {err}"),
             HttpClientError::UreqStdError(err) => {

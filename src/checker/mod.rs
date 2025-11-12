@@ -4,9 +4,9 @@ use crate::{
     checker::http_client::{HttpClient, HttpClientError},
     ipc, with_loc,
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use serde::Deserialize;
-use slog::{error, info, o, Logger};
+use slog::{Logger, error, info, o};
 use url::{Host, Url};
 
 #[derive(Debug)]
@@ -371,13 +371,15 @@ mod test {
             pick_highest_supported_nodeinfo_version(&NodeInfoPointer { links: vec![] }).is_err()
         );
 
-        assert!(pick_highest_supported_nodeinfo_version(&NodeInfoPointer {
-            links: vec![NodeInfoPointerLink {
-                rel: "http://nodeinfo.diaspora.software/ns/schema/2.2".to_string(),
-                href: "https://example.com/first".to_string()
-            }],
-        })
-        .is_err());
+        assert!(
+            pick_highest_supported_nodeinfo_version(&NodeInfoPointer {
+                links: vec![NodeInfoPointerLink {
+                    rel: "http://nodeinfo.diaspora.software/ns/schema/2.2".to_string(),
+                    href: "https://example.com/first".to_string()
+                }],
+            })
+            .is_err()
+        );
 
         assert_eq!(
             pick_highest_supported_nodeinfo_version(&NodeInfoPointer {

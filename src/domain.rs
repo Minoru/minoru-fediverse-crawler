@@ -66,18 +66,24 @@ mod test {
 
         // Full URLs
         assert!(Domain::from_host(&Host::Domain("http://example.org/hello".to_string())).is_err());
-        assert!(Domain::from_host(&Host::Domain(
-            "http://bar.example.org/goodbye#world".to_string()
-        ))
-        .is_err());
-        assert!(Domain::from_host(&Host::Domain(
-            "https://example.com/and/a/path?with=option".to_string()
-        ))
-        .is_err());
-        assert!(Domain::from_host(&Host::Domain(
-            "https://foo.example.com:81/and/a/path?with=option".to_string()
-        ))
-        .is_err());
+        assert!(
+            Domain::from_host(&Host::Domain(
+                "http://bar.example.org/goodbye#world".to_string()
+            ))
+            .is_err()
+        );
+        assert!(
+            Domain::from_host(&Host::Domain(
+                "https://example.com/and/a/path?with=option".to_string()
+            ))
+            .is_err()
+        );
+        assert!(
+            Domain::from_host(&Host::Domain(
+                "https://foo.example.com:81/and/a/path?with=option".to_string()
+            ))
+            .is_err()
+        );
 
         // IP addresses
         assert!(Domain::from_host(&Host::Domain("8.8.8.8".to_string())).is_err());
@@ -89,10 +95,12 @@ mod test {
 
         // Onion hidden services
         assert!(Domain::from_host(&Host::Domain("yzw45do3yrjfnbpr.onion".to_string())).is_ok());
-        assert!(Domain::from_host(&Host::Domain(
-            "zlzvfg5zcehs2t4qcm7woogyywfzwvrduqujsnehrjeg3tndn6a55nqd.onion".to_string()
-        ))
-        .is_ok());
+        assert!(
+            Domain::from_host(&Host::Domain(
+                "zlzvfg5zcehs2t4qcm7woogyywfzwvrduqujsnehrjeg3tndn6a55nqd.onion".to_string()
+            ))
+            .is_ok()
+        );
 
         // I2P
         assert!(Domain::from_host(&Host::Domain("example.i2p".to_string())).is_err());
@@ -154,25 +162,31 @@ mod test {
         assert!(parse_domain_name("[::1]").is_err());
 
         // Onion hidden services
-        assert!(parse_domain_name("yzw45do3yrjfnbpr.onion")
-            .unwrap()
-            .has_known_suffix());
-        assert!(parse_domain_name(
-            "zlzvfg5zcehs2t4qcm7woogyywfzwvrduqujsnehrjeg3tndn6a55nqd.onion"
-        )
-        .unwrap()
-        .has_known_suffix());
+        assert!(
+            parse_domain_name("yzw45do3yrjfnbpr.onion")
+                .unwrap()
+                .has_known_suffix()
+        );
+        assert!(
+            parse_domain_name("zlzvfg5zcehs2t4qcm7woogyywfzwvrduqujsnehrjeg3tndn6a55nqd.onion")
+                .unwrap()
+                .has_known_suffix()
+        );
 
         // I2P
         assert!(!parse_domain_name("example.i2p").unwrap().has_known_suffix());
 
         // OpenNIC
-        assert!(!parse_domain_name("outdated.bbs")
-            .unwrap()
-            .has_known_suffix());
+        assert!(
+            !parse_domain_name("outdated.bbs")
+                .unwrap()
+                .has_known_suffix()
+        );
         // This one is dropped from OpenNIC and is coming to "real" DNS soon
-        assert!(parse_domain_name("this.one.is.free")
-            .unwrap()
-            .has_known_suffix());
+        assert!(
+            parse_domain_name("this.one.is.free")
+                .unwrap()
+                .has_known_suffix()
+        );
     }
 }

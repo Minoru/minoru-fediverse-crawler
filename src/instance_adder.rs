@@ -1,5 +1,5 @@
 use crate::{db, domain::Domain};
-use slog::{error, info, Logger};
+use slog::{Logger, error, info};
 use std::io::{self, BufRead};
 
 pub fn main(logger: Logger) -> anyhow::Result<()> {

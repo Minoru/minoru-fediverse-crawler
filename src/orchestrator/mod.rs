@@ -1,9 +1,9 @@
 use crate::{db, with_loc};
 use anyhow::Context;
-use slog::{error, o, Logger};
+use slog::{Logger, error, o};
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use std::time::{Duration, SystemTime};
 

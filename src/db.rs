@@ -1,11 +1,10 @@
 //! Functions to query and update the database, plus some helpers.
 
 use crate::{domain::Domain, time, with_loc};
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use rusqlite::{
-    params,
+    Connection, ToSql, Transaction, params,
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
-    Connection, ToSql, Transaction,
 };
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
