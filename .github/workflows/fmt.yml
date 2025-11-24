@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Check out the code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: "cargo fmt"
         run: cargo fmt && git diff --exit-code
