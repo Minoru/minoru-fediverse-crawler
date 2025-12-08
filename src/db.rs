@@ -11,11 +11,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 const ONE_WEEK_IN_SECONDS: u64 = 60 * 60 * 24 * 7;
 
 fn is_sqlite_busy_error(error: &anyhow::Error) -> bool {
-    if let Some(error) = error.downcast_ref::<rusqlite::Error>() {
-        if let Some(code) = error.sqlite_error_code() {
+    if let Some(error) = error.downcast_ref::<rusqlite::Error>()
+        && let Some(code) = error.sqlite_error_code() {
             return code == rusqlite::ErrorCode::DatabaseBusy;
         }
-    }
 
     false
 }
