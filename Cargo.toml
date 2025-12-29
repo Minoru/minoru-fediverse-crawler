@@ -18,7 +18,7 @@ slog = { version = "2", default-features = false }
 slog-journald = { version = "2", default-features = false }
 url = { version = "2", default-features = false, features = [ "serde" ] }
 rusty_pool = { version = "0.7", default-features = false, features = [ "async" ] }
-signal-hook = { version = "0.3", default-features = false }
+signal-hook = { version = "0.4", default-features = false }
 robotstxt = { version = "0.3", default-features = false }
 tempfile = { version = "3", default-features = false }
 addr = { version = "0.15", default-features = false, features = [ "psl" ] }
