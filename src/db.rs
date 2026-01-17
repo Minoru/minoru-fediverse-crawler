@@ -397,7 +397,7 @@ pub fn mark_dead(conn: &mut Connection, instance: &Domain) -> anyhow::Result<()>
             )
             .context(with_loc!("Updating table 'dying_state_data'"))?;
 
-            let (checks_count, since): (u64, SystemTime) = tx
+            let (checks_count, since): (i64, SystemTime) = tx
                 .query_row(
                     "SELECT failed_checks_count, dying_since
                     FROM dying_state_data
@@ -443,7 +443,7 @@ fn is_moving_to_that_host_already(tx: &Transaction, from: i64, to: i64) -> anyho
             AND moving_to = ?2",
         params![from, to],
         |row| {
-            let count: u64 = row.get(0)?;
+            let count: i64 = row.get(0)?;
             Ok(count > 0)
         },
     )?)
@@ -457,7 +457,7 @@ fn has_moved_to_that_host_already(tx: &Transaction, from: i64, to: i64) -> anyho
             AND moved_to = ?2",
         params![from, to],
         |row| {
-            let count: u64 = row.get(0)?;
+            let count: i64 = row.get(0)?;
             Ok(count > 0)
         },
     )?)
@@ -555,7 +555,7 @@ pub fn mark_moved(conn: &mut Connection, instance: &Domain, to: &Domain) -> anyh
                 .context(with_loc!("Updating table 'moving_state_data'"))?;
 
                 // If the instance is in "moving" state for over a week, consider it moved
-                let (redirects_count, since): (u64, SystemTime) = tx
+                let (redirects_count, since): (i64, SystemTime) = tx
                     .query_row(
                         "SELECT redirects_count, moving_since
                         FROM moving_state_data
