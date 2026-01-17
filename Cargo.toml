@@ -11,7 +11,7 @@ anyhow = { version = "1", default-features = false, features = [ "std" ] }
 fastrand = { version = "2", default-features = false, features = [ "std" ] }
 lexopt = { version = "0.3", default-features = false }
 ureq = { version = "2", default-features = false, features = [ "tls", "gzip", "brotli", "json" ] }
-rusqlite = { version = "0.37", default-features = false }
+rusqlite = { version = "0.38", default-features = false, features = [ "cache" ] }
 serde = { version = "1", default-features = false, features = [ "derive" ] }
 serde_json = { version = "1", default-features = false }
 slog = { version = "2", default-features = false }
