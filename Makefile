@@ -34,6 +34,11 @@ deploy: index.html index.html.gz ansible/minoru-fediverse-crawler.service target
 instance_states.svg: instance_states.odg
 	libreoffice --headless --convert-to svg:draw_svg_Export $<
 
+plot-checks-histogram:
+	sqlite3 minoru-fediverse-crawler.db 'select next_check_datetime from instances' > data.csv
+	python3 plot_checks_histogram.py
+	rm data.csv
+
 clean:
 	cargo clean
 	rm -f index.html
