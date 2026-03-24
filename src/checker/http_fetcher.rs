@@ -1,8 +1,47 @@
-use crate::checker::http_client::{HttpClientError, Redirection};
 use slog::{Logger, error};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
+
+#[derive(Debug)]
+pub(super) struct Redirection {
+    pub(super) from: Url,
+    pub(super) to: Url,
+}
+
+#[derive(Debug)]
+pub(super) enum HttpFetcherError {
+    Moving(Box<Redirection>),
+    Moved(Box<Redirection>),
+    NoLocationHeader(Url),
+    UreqError(Box<ureq::Error>),
+}
+
+impl std::fmt::Display for HttpFetcherError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpFetcherError::Moving(redir) => {
+                write!(f, "{} is temporarily redirected to {}", redir.from, redir.to)
+            }
+            HttpFetcherError::Moved(redir) => {
+                write!(f, "{} is permanently redirected to {}", redir.from, redir.to)
+            }
+            HttpFetcherError::NoLocationHeader(from) => {
+                write!(f, "{from} is redirected, but we don't know where as `Location` header was missing or invalid")
+            }
+            HttpFetcherError::UreqError(err) => write!(f, "ureq's crate error: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for HttpFetcherError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            HttpFetcherError::UreqError(err) => err.source(),
+            _ => None,
+        }
+    }
+}
 
 pub(super) struct HttpFetcher {
     logger: Logger,
@@ -27,7 +66,7 @@ impl HttpFetcher {
         &self,
         url: &Url,
         accept_header: Option<&str>,
-    ) -> Result<ureq::Response, HttpClientError> {
+    ) -> Result<ureq::Response, HttpFetcherError> {
         get_with_type_ignoring_404(&self.logger, &self.inner, url, accept_header)
     }
 }
@@ -37,7 +76,7 @@ fn get_with_type_ignoring_404(
     agent: &Agent,
     url: &Url,
     acceptable_type: Option<&str>,
-) -> Result<ureq::Response, HttpClientError> {
+) -> Result<ureq::Response, HttpFetcherError> {
     // Our redirect policy is:
     // - follow redirects as long as they point to the same hostname:port, and schema didn't
     //   change
@@ -57,7 +96,7 @@ fn get_with_type_ignoring_404(
         match request.call() {
             Ok(r) => response = r,
             Err(ureq::Error::Status(404, r)) => response = r,
-            Err(e) => return Err(HttpClientError::UreqError(Box::new(e))),
+            Err(e) => return Err(HttpFetcherError::UreqError(Box::new(e))),
         }
         if !is_redirect(response.status()) {
             break;
@@ -68,7 +107,7 @@ fn get_with_type_ignoring_404(
         let to = response
             .header("location")
             .and_then(|h| Url::parse(h).ok())
-            .ok_or_else(|| HttpClientError::NoLocationHeader(current_url.clone()))?;
+            .ok_or_else(|| HttpFetcherError::NoLocationHeader(current_url.clone()))?;
 
         if !is_same_origin(&to, &current_url) {
             error!(
@@ -110,7 +149,7 @@ fn is_redirect(status: u16) -> bool {
     is_temporary_redirect(status) || is_permanent_redirect(status)
 }
 
-fn redirect_into_error(from: &Url, response: &ureq::Response) -> Result<(), HttpClientError> {
+fn redirect_into_error(from: &Url, response: &ureq::Response) -> Result<(), HttpFetcherError> {
     if !is_redirect(response.status()) {
         return Ok(());
     }
@@ -121,12 +160,12 @@ fn redirect_into_error(from: &Url, response: &ureq::Response) -> Result<(), Http
     let to = response
         .header("location")
         .and_then(|h| Url::parse(h).ok())
-        .ok_or_else(|| HttpClientError::NoLocationHeader(from.clone()))?;
+        .ok_or_else(|| HttpFetcherError::NoLocationHeader(from.clone()))?;
 
     if is_temporary_redirect(response.status()) {
-        return Err(HttpClientError::Moving(Box::new(Redirection { from, to })));
+        return Err(HttpFetcherError::Moving(Box::new(Redirection { from, to })));
     } else if is_permanent_redirect(response.status()) {
-        return Err(HttpClientError::Moved(Box::new(Redirection { from, to })));
+        return Err(HttpFetcherError::Moved(Box::new(Redirection { from, to })));
     }
 
     unreachable!(

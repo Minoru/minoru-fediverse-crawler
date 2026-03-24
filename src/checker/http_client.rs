@@ -1,20 +1,10 @@
 //! HTTP client that automatically checks requests against robots.txt.
-use crate::checker::http_fetcher::HttpFetcher;
+use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, Redirection};
 use slog::{Logger, info};
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
 const USER_AGENT_TOKEN: &str = "MinoruFediverseCrawler";
-
-/// A redirection from one URL to another.
-#[derive(Debug)]
-pub struct Redirection {
-    /// The URL from which we were redirected.
-    pub from: Url,
-
-    /// The URL to which we were redirected.
-    pub to: Url,
-}
 
 #[derive(Debug)]
 pub enum HttpClientError {
@@ -94,6 +84,17 @@ impl std::error::Error for HttpClientError {
     }
 }
 
+impl From<HttpFetcherError> for HttpClientError {
+    fn from(err: HttpFetcherError) -> Self {
+        match err {
+            HttpFetcherError::Moving(r) => Self::Moving(r),
+            HttpFetcherError::Moved(r) => Self::Moved(r),
+            HttpFetcherError::NoLocationHeader(u) => Self::NoLocationHeader(u),
+            HttpFetcherError::UreqError(e) => Self::UreqError(e),
+        }
+    }
+}
+
 pub struct HttpClient {
     fetcher: HttpFetcher,
     robots_txt: String,
@@ -107,7 +108,8 @@ impl HttpClient {
             let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
             info!(logger, "Fetching robots.txt");
             fetcher
-                .get(&url, None)?
+                .get(&url, None)
+                .map_err(HttpClientError::from)?
                 .into_string()
                 .map_err(HttpClientError::UreqStdError)?
         };
@@ -127,7 +129,7 @@ impl HttpClient {
                 let ureq_err = ureq::Error::Status(404, r);
                 Err(HttpClientError::UreqError(Box::new(ureq_err)))
             }
-            x => x,
+            x => x.map_err(HttpClientError::from),
         }
     }
 
