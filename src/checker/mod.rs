@@ -1,3 +1,4 @@
+mod http_fetcher;
 mod http_client;
 
 use crate::{
