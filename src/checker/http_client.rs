@@ -106,9 +106,15 @@ impl HttpClient {
             let url = format!("https://{host}/robots.txt");
             let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
             info!(logger, "Fetching robots.txt");
-            fetcher.get(&url, None)?.into_string().map_err(HttpClientError::UreqStdError)?
+            fetcher
+                .get(&url, None)?
+                .into_string()
+                .map_err(HttpClientError::UreqStdError)?
         };
-        Ok(Self { fetcher, robots_txt })
+        Ok(Self {
+            fetcher,
+            robots_txt,
+        })
     }
 
     pub fn get(&self, url: &Url) -> Result<ureq::Response, HttpClientError> {
@@ -118,7 +124,7 @@ impl HttpClient {
 
         match self.fetcher.get(url, Some("application/json")) {
             Ok(r) if r.status() == 404 => {
-                let ureq_err: ureq::Error = ureq::Error::Status(404, r);
+                let ureq_err = ureq::Error::Status(404, r);
                 Err(HttpClientError::UreqError(Box::new(ureq_err)))
             }
             x => x,
@@ -131,5 +137,3 @@ impl HttpClient {
         matcher.one_agent_allowed_by_robots(&self.robots_txt, USER_AGENT_TOKEN, url)
     }
 }
-
-

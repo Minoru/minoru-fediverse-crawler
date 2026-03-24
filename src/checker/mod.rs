@@ -1,5 +1,5 @@
-mod http_fetcher;
 mod http_client;
+mod http_fetcher;
 
 use crate::{
     checker::http_client::{HttpClient, HttpClientError},

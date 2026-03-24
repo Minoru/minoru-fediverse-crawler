@@ -20,6 +20,8 @@
 
 ## Code Style Guidelines
 
+Run `cargo fmt` at the end of the turn to enforce as much of this as possible.
+
 **Imports:**
 - Use `use crate::` for internal module imports
 - Use `use anyhow::{Context, anyhow, bail}` for error handling
@@ -30,7 +32,6 @@
 - 4-space indentation
 - No comments unless explaining non-obvious code
 - Use `#[deny(clippy::expect_used, clippy::unwrap_used, ...)]` at crate root
-- Run `cargo fmt` to enforce it
 
 **Error Handling:**
 - Use `anyhow::Result` for function return types

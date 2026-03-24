@@ -23,7 +23,11 @@ impl HttpFetcher {
         Self { logger, inner }
     }
 
-    pub(super) fn get(&self, url: &Url, accept_header: Option<&str>) -> Result<ureq::Response, HttpClientError> {
+    pub(super) fn get(
+        &self,
+        url: &Url,
+        accept_header: Option<&str>,
+    ) -> Result<ureq::Response, HttpClientError> {
         get_with_type_ignoring_404(&self.logger, &self.inner, url, accept_header)
     }
 }
