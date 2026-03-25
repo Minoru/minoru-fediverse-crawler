@@ -244,4 +244,37 @@ mod test {
         assert_eq!(response.status(), STATUS);
         assert_eq!(response.into_string().unwrap(), BODY);
     }
+
+    #[test]
+    fn get_adds_accept_header_when_provided() {
+        use httpmock::prelude::*;
+
+        const URL: &str = "/my-path/for_testing";
+        const STATUS: u16 = 200;
+        const BODY: &str = "All is well.";
+        const ACCEPT_HEADER_VALUE: &str = "application/json";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET")
+                .path(URL)
+                .header("Accept", ACCEPT_HEADER_VALUE);
+            then.status(STATUS).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, Some(ACCEPT_HEADER_VALUE)).unwrap();
+
+        mock.assert();
+
+        assert_eq!(response.get_url(), server.url(URL));
+        assert_eq!(response.status(), STATUS);
+        assert_eq!(response.into_string().unwrap(), BODY);
+    }
 }
