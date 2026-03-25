@@ -21,13 +21,24 @@ impl std::fmt::Display for HttpFetcherError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             HttpFetcherError::Moving(redir) => {
-                write!(f, "{} is temporarily redirected to {}", redir.from, redir.to)
+                write!(
+                    f,
+                    "{} is temporarily redirected to {}",
+                    redir.from, redir.to
+                )
             }
             HttpFetcherError::Moved(redir) => {
-                write!(f, "{} is permanently redirected to {}", redir.from, redir.to)
+                write!(
+                    f,
+                    "{} is permanently redirected to {}",
+                    redir.from, redir.to
+                )
             }
             HttpFetcherError::NoLocationHeader(from) => {
-                write!(f, "{from} is redirected, but we don't know where as `Location` header was missing or invalid")
+                write!(
+                    f,
+                    "{from} is redirected, but we don't know where as `Location` header was missing or invalid"
+                )
             }
             HttpFetcherError::UreqError(err) => write!(f, "ureq's crate error: {err}"),
         }
