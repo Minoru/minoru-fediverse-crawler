@@ -214,4 +214,34 @@ mod test {
         assert!(is_same_origin(&https_example_com, &https_example_com));
         assert!(is_same_origin(&https_example_com, &https_example_com_443));
     }
+
+    #[test]
+    fn get_fetches_given_url() {
+        use httpmock::prelude::*;
+
+        const URL: &str = "/my-path/for_testing";
+        const STATUS: u16 = 200;
+        const BODY: &str = "All is well.";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(STATUS).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock.assert();
+
+        assert_eq!(response.get_url(), server.url(URL));
+        assert_eq!(response.status(), STATUS);
+        assert_eq!(response.into_string().unwrap(), BODY);
+    }
 }
