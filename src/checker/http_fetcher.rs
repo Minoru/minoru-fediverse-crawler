@@ -511,9 +511,67 @@ mod test {
 
     #[test]
     fn get_follows_redirect_chain_up_to_limit() {
-        // **Arrange:** Mock chain of 5 redirects (302 → 302 → ... → 200), all same origin
-        // **Act:** `fetcher.get(&initial_url, None)`
-        // **Assert:** Follows all 5, returns final response
+        use httpmock::prelude::*;
+
+        const URL1: &str = "/r1";
+        const URL2: &str = "/r2";
+        const URL3: &str = "/r3";
+        const URL4: &str = "/r4";
+        const URL5: &str = "/r5";
+        const FINAL_URL: &str = "/final";
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "End of chain.";
+
+        let server = MockServer::start();
+
+        let mock1 = server.mock(|when, then| {
+            when.method("GET").path(URL1);
+            then.status(302).header("Location", server.url(URL2));
+        });
+
+        let mock2 = server.mock(|when, then| {
+            when.method("GET").path(URL2);
+            then.status(302).header("Location", server.url(URL3));
+        });
+
+        let mock3 = server.mock(|when, then| {
+            when.method("GET").path(URL3);
+            then.status(302).header("Location", server.url(URL4));
+        });
+
+        let mock4 = server.mock(|when, then| {
+            when.method("GET").path(URL4);
+            then.status(302).header("Location", server.url(URL5));
+        });
+
+        let mock5 = server.mock(|when, then| {
+            when.method("GET").path(URL5);
+            then.status(302).header("Location", server.url(FINAL_URL));
+        });
+
+        let mock_final = server.mock(|when, then| {
+            when.method("GET").path(FINAL_URL);
+            then.status(STATUS_FINAL).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL1);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock1.assert();
+        mock2.assert();
+        mock3.assert();
+        mock4.assert();
+        mock5.assert();
+        mock_final.assert();
+
+        assert_eq!(response.get_url(), server.url(FINAL_URL));
+        assert_eq!(response.status(), STATUS_FINAL);
+        assert_eq!(response.into_string().unwrap(), BODY);
     }
 
     #[test]
