@@ -381,4 +381,40 @@ mod test {
             assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
         }
     }
+
+    #[test]
+    fn get_stops_on_redirect_to_different_schema() {
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const TARGET_URL: &str = "/target";
+
+        let server1 = MockServer::start();
+        let server2 = MockServer::start();
+
+        let server2_url = server2.url(TARGET_URL);
+        let http_location = server2_url.replace("https://", "http://");
+
+        let mock_redirect = server1.mock(|when, then| {
+            when.method("GET").path(INITIAL_URL);
+            then.status(302).header("Location", &http_location);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server1.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock_redirect.assert_calls(1);
+
+        assert!(matches!(result, Err(HttpFetcherError::Moving(_))));
+        if let Err(HttpFetcherError::Moving(redir)) = result {
+            assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
+            assert_eq!(redir.to.as_str(), http_location);
+        }
+    }
 }
