@@ -348,4 +348,37 @@ mod test {
             assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
         }
     }
+
+    #[test]
+    fn get_returns_moved_error_on_permanent_redirect_no_follow() {
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const TARGET_URL: &str = "/target";
+
+        let server1 = MockServer::start();
+        let server2 = MockServer::start();
+
+        let mock_redirect = server1.mock(|when, then| {
+            when.method("GET").path(INITIAL_URL);
+            then.status(301).header("Location", server2.url(TARGET_URL));
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server1.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock_redirect.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::Moved(_))));
+        if let Err(HttpFetcherError::Moved(redir)) = result {
+            assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
+            assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
+        }
+    }
 }
