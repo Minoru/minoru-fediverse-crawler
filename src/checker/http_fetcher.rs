@@ -194,6 +194,7 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
 #[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
+    use slog::o;
 
     #[test]
     fn test_origin() {
@@ -229,7 +230,7 @@ mod test {
             then.status(STATUS).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let logger = slog::Logger::root(slog::Discard, o!());
 
         let fetcher = HttpFetcher::new(logger);
 
@@ -262,7 +263,7 @@ mod test {
             then.status(STATUS).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let logger = slog::Logger::root(slog::Discard, o!());
 
         let fetcher = HttpFetcher::new(logger);
 
@@ -275,6 +276,46 @@ mod test {
 
         assert_eq!(response.get_url(), server.url(URL));
         assert_eq!(response.status(), STATUS);
+        assert_eq!(response.into_string().unwrap(), BODY);
+    }
+
+    #[test]
+    fn get_follows_temporary_redirect_same_origin() {
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const FINAL_URL: &str = "/final";
+        const STATUS_INITIAL: u16 = 302;
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "Redirected successfully.";
+
+        let server = MockServer::start();
+
+        let mock_redirect = server.mock(|when, then| {
+            when.method("GET").path(INITIAL_URL);
+            then.status(STATUS_INITIAL)
+                .header("Location", server.url(FINAL_URL));
+        });
+
+        let mock_final = server.mock(|when, then| {
+            when.method("GET").path(FINAL_URL);
+            then.status(STATUS_FINAL).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock_redirect.assert();
+        mock_final.assert();
+
+        assert_eq!(response.get_url(), server.url(FINAL_URL));
+        assert_eq!(response.status(), STATUS_FINAL);
         assert_eq!(response.into_string().unwrap(), BODY);
     }
 }
