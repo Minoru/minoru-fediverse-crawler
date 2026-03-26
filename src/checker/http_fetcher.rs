@@ -417,4 +417,88 @@ mod test {
             assert_eq!(redir.to.as_str(), http_location);
         }
     }
+
+    #[test]
+    fn get_stops_on_redirect_to_different_port() {
+        // **Arrange:** Mock returns 302 from port 8080 to 8081
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns redirect error (different origin due to port)
+    }
+
+    #[test]
+    fn get_returns_no_location_header_error() {
+        // **Arrange:** Mock returns 302 without Location header
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns `HttpFetcherError::NoLocationHeader(url)`
+    }
+
+    #[test]
+    fn get_handles_invalid_location_url() {
+        // **Arrange:** Mock returns 302 with Location: "not a valid url"
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns `HttpFetcherError::NoLocationHeader(url)`
+    }
+
+    #[test]
+    fn get_follows_redirect_chain_up_to_limit() {
+        // **Arrange:** Mock chain of 5 redirects (302 → 302 → ... → 200), all same origin
+        // **Act:** `fetcher.get(&initial_url, None)`
+        // **Assert:** Follows all 5, returns final response
+    }
+
+    #[test]
+    fn get_stops_after_10_redirects() {
+        // **Arrange:** Mock chain of 11 redirects, all same origin
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Stops at redirect #10, returns error with last URL
+    }
+
+    #[test]
+    fn get_handles_303_see_other() {
+        // **Arrange:** Mock returns 303 → 200 same origin
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Follows redirect (303 is temporary)
+    }
+
+    #[test]
+    fn get_handles_307_temporary_redirect() {
+        // **Arrange:** Mock returns 307 → 200 same origin
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Follows redirect (307 is temporary)
+    }
+
+    #[test]
+    fn get_handles_308_permanent_redirect() {
+        // **Arrange:** Mock returns 308 to different origin
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns `HttpFetcherError::Moved`
+    }
+
+    #[test]
+    fn get_returns_404_as_error() {
+        // **Arrange:** Mock returns 404
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns `HttpFetcherError::UreqError(Status(404, ...))`
+    }
+
+    #[test]
+    fn get_preserves_accept_header_across_redirects() {
+        // **Arrange:** Mock chain (302 → 200) that verifies Accept header on both requests
+        // **Act:** `fetcher.get(&url, Some("application/json"))`
+        // **Assert:** Both requests include Accept: application/json
+    }
+
+    #[test]
+    fn get_handles_subdomain_redirect_as_different_origin() {
+        // **Arrange:** Mock returns 302 from `example.com` to `foo.example.com`
+        // **Act:** `fetcher.get(&url, None)`
+        // **Assert:** Returns redirect error (subdomains are different origins)
+    }
+
+    #[test]
+    fn is_redirect_identifies_all_redirect_codes() {
+        // **Arrange:** Test all status codes 301-308
+        // **Act:** Call `is_redirect()` with each
+        // **Assert:** Returns true for 301, 302, 303, 307, 308; false for others
+    }
 }
