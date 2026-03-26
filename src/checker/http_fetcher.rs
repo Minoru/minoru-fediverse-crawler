@@ -194,7 +194,6 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
 #[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
-    use slog::o;
 
     #[test]
     fn test_origin() {
@@ -230,7 +229,7 @@ mod test {
             then.status(STATUS).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, o!());
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
 
         let fetcher = HttpFetcher::new(logger);
 
@@ -263,7 +262,7 @@ mod test {
             then.status(STATUS).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, o!());
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
 
         let fetcher = HttpFetcher::new(logger);
 
@@ -285,7 +284,6 @@ mod test {
 
         const INITIAL_URL: &str = "/initial";
         const FINAL_URL: &str = "/final";
-        const STATUS_INITIAL: u16 = 302;
         const STATUS_FINAL: u16 = 200;
         const BODY: &str = "Redirected successfully.";
 
@@ -293,8 +291,7 @@ mod test {
 
         let mock_redirect = server.mock(|when, then| {
             when.method("GET").path(INITIAL_URL);
-            then.status(STATUS_INITIAL)
-                .header("Location", server.url(FINAL_URL));
+            then.status(302).header("Location", server.url(FINAL_URL));
         });
 
         let mock_final = server.mock(|when, then| {
@@ -302,7 +299,7 @@ mod test {
             then.status(STATUS_FINAL).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, o!());
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
 
         let fetcher = HttpFetcher::new(logger);
 
