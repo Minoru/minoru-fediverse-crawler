@@ -453,9 +453,31 @@ mod test {
 
     #[test]
     fn get_returns_no_location_header_error() {
-        // **Arrange:** Mock returns 302 without Location header
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Returns `HttpFetcherError::NoLocationHeader(url)`
+        use httpmock::prelude::*;
+
+        const URL: &str = "/redirect-no-location";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(302);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::NoLocationHeader(_))));
+        if let Err(HttpFetcherError::NoLocationHeader(from)) = result {
+            assert_eq!(from.as_str(), server.url(URL));
+        }
     }
 
     #[test]
