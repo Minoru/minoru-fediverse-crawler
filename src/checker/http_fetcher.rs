@@ -482,9 +482,31 @@ mod test {
 
     #[test]
     fn get_handles_invalid_location_url() {
-        // **Arrange:** Mock returns 302 with Location: "not a valid url"
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Returns `HttpFetcherError::NoLocationHeader(url)`
+        use httpmock::prelude::*;
+
+        const URL: &str = "/redirect-invalid-location";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(302).header("Location", "not a valid url");
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::NoLocationHeader(_))));
+        if let Err(HttpFetcherError::NoLocationHeader(from)) = result {
+            assert_eq!(from.as_str(), server.url(URL));
+        }
     }
 
     #[test]
