@@ -756,9 +756,32 @@ mod test {
 
     #[test]
     fn get_returns_404_as_ordinary_response_not_an_error() {
-        // **Arrange:** Mock returns 404
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Returns response as-is
+        use httpmock::prelude::*;
+
+        const URL: &str = "/missing";
+        const STATUS: u16 = 404;
+        const BODY: &str = "Not Found";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(STATUS).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock.assert();
+
+        assert_eq!(response.get_url(), server.url(URL));
+        assert_eq!(response.status(), STATUS);
+        assert_eq!(response.into_string().unwrap(), BODY);
     }
 
     #[test]
