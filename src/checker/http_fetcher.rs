@@ -1,4 +1,4 @@
-use slog::{error, Logger};
+use slog::{Logger, error};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
