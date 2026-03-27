@@ -786,9 +786,44 @@ mod test {
 
     #[test]
     fn get_preserves_accept_header_across_redirects() {
-        // **Arrange:** Mock chain (302 → 200) that verifies Accept header on both requests
-        // **Act:** `fetcher.get(&url, Some("application/json"))`
-        // **Assert:** Both requests include Accept: application/json
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const FINAL_URL: &str = "/final";
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "Redirected successfully.";
+        const ACCEPT_HEADER_VALUE: &str = "application/json";
+
+        let server = MockServer::start();
+
+        let mock_redirect = server.mock(|when, then| {
+            when.method("GET")
+                .path(INITIAL_URL)
+                .header("Accept", ACCEPT_HEADER_VALUE);
+            then.status(302).header("Location", server.url(FINAL_URL));
+        });
+
+        let mock_final = server.mock(|when, then| {
+            when.method("GET")
+                .path(FINAL_URL)
+                .header("Accept", ACCEPT_HEADER_VALUE);
+            then.status(STATUS_FINAL).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, Some(ACCEPT_HEADER_VALUE)).unwrap();
+
+        mock_redirect.assert();
+        mock_final.assert();
+
+        assert_eq!(response.get_url(), server.url(FINAL_URL));
+        assert_eq!(response.status(), STATUS_FINAL);
+        assert_eq!(response.into_string().unwrap(), BODY);
     }
 
     #[test]
