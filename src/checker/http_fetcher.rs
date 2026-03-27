@@ -137,7 +137,7 @@ fn get_with_type_ignoring_404(
 
         current_url = to;
     }
-    redirect_into_error(&current_url, &response)?;
+    redirect_into_error(url, &response)?;
     Ok(response)
 }
 
@@ -642,7 +642,7 @@ mod test {
 
         assert!(matches!(result, Err(HttpFetcherError::Moving(_))));
         if let Err(HttpFetcherError::Moving(redir)) = result {
-            assert_eq!(redir.from.as_str(), server.url("/r10"));
+            assert_eq!(redir.from.as_str(), server.url("/r1"));
             assert_eq!(redir.to.as_str(), server.url("/r11"));
         }
     }
