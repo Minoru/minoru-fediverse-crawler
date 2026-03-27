@@ -1,4 +1,4 @@
-use slog::{Logger, error};
+use slog::{error, Logger};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
@@ -686,9 +686,39 @@ mod test {
 
     #[test]
     fn get_handles_307_temporary_redirect() {
-        // **Arrange:** Mock returns 307 → 200 same origin
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Follows redirect (307 is temporary)
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const FINAL_URL: &str = "/final";
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "Redirected with 307.";
+
+        let server = MockServer::start();
+
+        let mock_redirect = server.mock(|when, then| {
+            when.method("GET").path(INITIAL_URL);
+            then.status(307).header("Location", server.url(FINAL_URL));
+        });
+
+        let mock_final = server.mock(|when, then| {
+            when.method("GET").path(FINAL_URL);
+            then.status(STATUS_FINAL).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock_redirect.assert();
+        mock_final.assert();
+
+        assert_eq!(response.get_url(), server.url(FINAL_URL));
+        assert_eq!(response.status(), STATUS_FINAL);
+        assert_eq!(response.into_string().unwrap(), BODY);
     }
 
     #[test]
