@@ -755,10 +755,10 @@ mod test {
     }
 
     #[test]
-    fn get_returns_404_as_error() {
+    fn get_returns_404_as_ordinary_response_not_an_error() {
         // **Arrange:** Mock returns 404
         // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Returns `HttpFetcherError::UreqError(Status(404, ...))`
+        // **Assert:** Returns response as-is
     }
 
     #[test]
