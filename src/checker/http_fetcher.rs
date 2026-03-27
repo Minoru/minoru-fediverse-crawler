@@ -825,18 +825,4 @@ mod test {
         assert_eq!(response.status(), STATUS_FINAL);
         assert_eq!(response.into_string().unwrap(), BODY);
     }
-
-    #[test]
-    fn get_handles_subdomain_redirect_as_different_origin() {
-        // **Arrange:** Mock returns 302 from `example.com` to `foo.example.com`
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Returns redirect error (subdomains are different origins)
-    }
-
-    #[test]
-    fn is_redirect_identifies_all_redirect_codes() {
-        // **Arrange:** Test all status codes 301-308
-        // **Act:** Call `is_redirect()` with each
-        // **Assert:** Returns true for 301, 302, 303, 307, 308; false for others
-    }
 }
