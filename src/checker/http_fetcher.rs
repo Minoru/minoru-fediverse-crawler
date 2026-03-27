@@ -668,7 +668,7 @@ mod test {
             then.status(STATUS_FINAL).body(BODY);
         });
 
-        let logger = slog::Logger::root(slog::Discard, slog::o!("_type" => ""));
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
         let fetcher = HttpFetcher::new(logger);
 
         let url = server.url(INITIAL_URL);
