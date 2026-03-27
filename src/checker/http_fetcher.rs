@@ -120,6 +120,11 @@ fn get_with_type_ignoring_404(
             .and_then(|h| Url::parse(h).ok())
             .ok_or_else(|| HttpFetcherError::NoLocationHeader(current_url.clone()))?;
 
+        redirects_left = redirects_left.saturating_sub(1);
+        if redirects_left == 0 {
+            break;
+        }
+
         if !is_same_origin(&to, &current_url) {
             error!(
                 logger,
@@ -131,13 +136,8 @@ fn get_with_type_ignoring_404(
         }
 
         current_url = to;
-
-        redirects_left = redirects_left.saturating_sub(1);
-        if redirects_left == 0 {
-            break;
-        }
     }
-    redirect_into_error(url, &response)?;
+    redirect_into_error(&current_url, &response)?;
     Ok(response)
 }
 
@@ -576,9 +576,75 @@ mod test {
 
     #[test]
     fn get_stops_after_10_redirects() {
-        // **Arrange:** Mock chain of 11 redirects, all same origin
-        // **Act:** `fetcher.get(&url, None)`
-        // **Assert:** Stops at redirect #10, returns error with last URL
+        use httpmock::prelude::*;
+
+        let server = MockServer::start();
+
+        let mock1 = server.mock(|when, then| {
+            when.method("GET").path("/r1");
+            then.status(302).header("Location", server.url("/r2"));
+        });
+        let mock2 = server.mock(|when, then| {
+            when.method("GET").path("/r2");
+            then.status(302).header("Location", server.url("/r3"));
+        });
+        let mock3 = server.mock(|when, then| {
+            when.method("GET").path("/r3");
+            then.status(302).header("Location", server.url("/r4"));
+        });
+        let mock4 = server.mock(|when, then| {
+            when.method("GET").path("/r4");
+            then.status(302).header("Location", server.url("/r5"));
+        });
+        let mock5 = server.mock(|when, then| {
+            when.method("GET").path("/r5");
+            then.status(302).header("Location", server.url("/r6"));
+        });
+        let mock6 = server.mock(|when, then| {
+            when.method("GET").path("/r6");
+            then.status(302).header("Location", server.url("/r7"));
+        });
+        let mock7 = server.mock(|when, then| {
+            when.method("GET").path("/r7");
+            then.status(302).header("Location", server.url("/r8"));
+        });
+        let mock8 = server.mock(|when, then| {
+            when.method("GET").path("/r8");
+            then.status(302).header("Location", server.url("/r9"));
+        });
+        let mock9 = server.mock(|when, then| {
+            when.method("GET").path("/r9");
+            then.status(302).header("Location", server.url("/r10"));
+        });
+        let mock10 = server.mock(|when, then| {
+            when.method("GET").path("/r10");
+            then.status(302).header("Location", server.url("/r11"));
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url("/r1");
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock1.assert();
+        mock2.assert();
+        mock3.assert();
+        mock4.assert();
+        mock5.assert();
+        mock6.assert();
+        mock7.assert();
+        mock8.assert();
+        mock9.assert();
+        mock10.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::Moving(_))));
+        if let Err(HttpFetcherError::Moving(redir)) = result {
+            assert_eq!(redir.from.as_str(), server.url("/r10"));
+            assert_eq!(redir.to.as_str(), server.url("/r11"));
+        }
     }
 
     #[test]
