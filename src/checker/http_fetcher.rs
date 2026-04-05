@@ -513,41 +513,29 @@ mod test {
     fn get_follows_redirect_chain_up_to_limit() {
         use httpmock::prelude::*;
 
-        const URL1: &str = "/r1";
-        const URL2: &str = "/r2";
-        const URL3: &str = "/r3";
-        const URL4: &str = "/r4";
-        const URL5: &str = "/r5";
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
         const BODY: &str = "End of chain.";
+        const REDIRECT_COUNT: usize = 5;
 
         let server = MockServer::start();
 
-        let mock1 = server.mock(|when, then| {
-            when.method("GET").path(URL1);
-            then.status(302).header("Location", server.url(URL2));
-        });
+        let mut mocks = Vec::new();
+        for i in 1..REDIRECT_COUNT {
+            let from = format!("/r{}", i);
+            let to = format!("/r{}", i + 1);
+            let mock = server.mock(|when, then| {
+                when.method("GET").path(&from);
+                then.status(302).header("Location", server.url(&to));
+            });
+            mocks.push(mock);
+        }
 
-        let mock2 = server.mock(|when, then| {
-            when.method("GET").path(URL2);
-            then.status(302).header("Location", server.url(URL3));
-        });
-
-        let mock3 = server.mock(|when, then| {
-            when.method("GET").path(URL3);
-            then.status(302).header("Location", server.url(URL4));
-        });
-
-        let mock4 = server.mock(|when, then| {
-            when.method("GET").path(URL4);
-            then.status(302).header("Location", server.url(URL5));
-        });
-
-        let mock5 = server.mock(|when, then| {
-            when.method("GET").path(URL5);
+        let last_redirect_mock = server.mock(|when, then| {
+            when.method("GET").path(format!("/r{}", REDIRECT_COUNT));
             then.status(302).header("Location", server.url(FINAL_URL));
         });
+        mocks.push(last_redirect_mock);
 
         let mock_final = server.mock(|when, then| {
             when.method("GET").path(FINAL_URL);
@@ -557,16 +545,14 @@ mod test {
         let logger = slog::Logger::root(slog::Discard, slog::o!());
         let fetcher = HttpFetcher::new(logger);
 
-        let url = server.url(URL1);
+        let url = server.url("/r1");
         let url = url::Url::parse(&url).unwrap();
 
         let response = fetcher.get(&url, None).unwrap();
 
-        mock1.assert();
-        mock2.assert();
-        mock3.assert();
-        mock4.assert();
-        mock5.assert();
+        for mock in mocks {
+            mock.assert();
+        }
         mock_final.assert();
 
         assert_eq!(response.get_url(), server.url(FINAL_URL));
@@ -580,46 +566,16 @@ mod test {
 
         let server = MockServer::start();
 
-        let mock1 = server.mock(|when, then| {
-            when.method("GET").path("/r1");
-            then.status(302).header("Location", server.url("/r2"));
-        });
-        let mock2 = server.mock(|when, then| {
-            when.method("GET").path("/r2");
-            then.status(302).header("Location", server.url("/r3"));
-        });
-        let mock3 = server.mock(|when, then| {
-            when.method("GET").path("/r3");
-            then.status(302).header("Location", server.url("/r4"));
-        });
-        let mock4 = server.mock(|when, then| {
-            when.method("GET").path("/r4");
-            then.status(302).header("Location", server.url("/r5"));
-        });
-        let mock5 = server.mock(|when, then| {
-            when.method("GET").path("/r5");
-            then.status(302).header("Location", server.url("/r6"));
-        });
-        let mock6 = server.mock(|when, then| {
-            when.method("GET").path("/r6");
-            then.status(302).header("Location", server.url("/r7"));
-        });
-        let mock7 = server.mock(|when, then| {
-            when.method("GET").path("/r7");
-            then.status(302).header("Location", server.url("/r8"));
-        });
-        let mock8 = server.mock(|when, then| {
-            when.method("GET").path("/r8");
-            then.status(302).header("Location", server.url("/r9"));
-        });
-        let mock9 = server.mock(|when, then| {
-            when.method("GET").path("/r9");
-            then.status(302).header("Location", server.url("/r10"));
-        });
-        let mock10 = server.mock(|when, then| {
-            when.method("GET").path("/r10");
-            then.status(302).header("Location", server.url("/r11"));
-        });
+        let mut mocks = Vec::new();
+        for i in 1..=10 {
+            let from = format!("/r{}", i);
+            let to = format!("/r{}", i + 1);
+            let mock = server.mock(|when, then| {
+                when.method("GET").path(&from);
+                then.status(302).header("Location", server.url(&to));
+            });
+            mocks.push(mock);
+        }
 
         let logger = slog::Logger::root(slog::Discard, slog::o!());
         let fetcher = HttpFetcher::new(logger);
@@ -629,16 +585,9 @@ mod test {
 
         let result = fetcher.get(&url, None);
 
-        mock1.assert();
-        mock2.assert();
-        mock3.assert();
-        mock4.assert();
-        mock5.assert();
-        mock6.assert();
-        mock7.assert();
-        mock8.assert();
-        mock9.assert();
-        mock10.assert();
+        for mock in mocks {
+            mock.assert();
+        }
 
         assert!(matches!(result, Err(HttpFetcherError::Moving(_))));
         if let Err(HttpFetcherError::Moving(redir)) = result {
