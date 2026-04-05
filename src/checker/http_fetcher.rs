@@ -279,41 +279,47 @@ mod test {
     }
 
     #[test]
-    fn get_follows_temporary_redirect_same_origin() {
+    fn get_follows_temporary_redirect_same_origin_all_codes() {
         use httpmock::prelude::*;
 
         const INITIAL_URL: &str = "/initial";
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
-        const BODY: &str = "Redirected successfully.";
 
-        let server = MockServer::start();
+        // Test all temporary redirect codes (302, 303, 307)
+        for (redirect_status, body) in [
+            (302, "Redirected with 302."),
+            (303, "Redirected with 303."),
+            (307, "Redirected with 307."),
+        ] {
+            let server = MockServer::start();
 
-        let mock_redirect = server.mock(|when, then| {
-            when.method("GET").path(INITIAL_URL);
-            then.status(302).header("Location", server.url(FINAL_URL));
-        });
+            let mock_redirect = server.mock(|when, then| {
+                when.method("GET").path(INITIAL_URL);
+                then.status(redirect_status)
+                    .header("Location", server.url(FINAL_URL));
+            });
 
-        let mock_final = server.mock(|when, then| {
-            when.method("GET").path(FINAL_URL);
-            then.status(STATUS_FINAL).body(BODY);
-        });
+            let mock_final = server.mock(|when, then| {
+                when.method("GET").path(FINAL_URL);
+                then.status(STATUS_FINAL).body(body);
+            });
 
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
+            let logger = slog::Logger::root(slog::Discard, slog::o!());
+            let fetcher = HttpFetcher::new(logger);
 
-        let fetcher = HttpFetcher::new(logger);
+            let url = server.url(INITIAL_URL);
+            let url = url::Url::parse(&url).unwrap();
 
-        let url = server.url(INITIAL_URL);
-        let url = url::Url::parse(&url).unwrap();
+            let response = fetcher.get(&url, None).unwrap();
 
-        let response = fetcher.get(&url, None).unwrap();
+            mock_redirect.assert();
+            mock_final.assert();
 
-        mock_redirect.assert();
-        mock_final.assert();
-
-        assert_eq!(response.get_url(), server.url(FINAL_URL));
-        assert_eq!(response.status(), STATUS_FINAL);
-        assert_eq!(response.into_string().unwrap(), BODY);
+            assert_eq!(response.get_url(), server.url(FINAL_URL));
+            assert_eq!(response.status(), STATUS_FINAL);
+            assert_eq!(response.into_string().unwrap(), body);
+        }
     }
 
     #[test]
@@ -350,35 +356,38 @@ mod test {
     }
 
     #[test]
-    fn get_returns_moved_error_on_permanent_redirect_no_follow() {
+    fn get_returns_moved_error_on_permanent_redirect_no_follow_all_codes() {
         use httpmock::prelude::*;
 
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
-        let server1 = MockServer::start();
-        let server2 = MockServer::start();
+        // Test all permanent redirect codes (301, 308)
+        for redirect_status in [301, 308] {
+            let server1 = MockServer::start();
+            let server2 = MockServer::start();
 
-        let mock_redirect = server1.mock(|when, then| {
-            when.method("GET").path(INITIAL_URL);
-            then.status(301).header("Location", server2.url(TARGET_URL));
-        });
+            let mock_redirect = server1.mock(|when, then| {
+                when.method("GET").path(INITIAL_URL);
+                then.status(redirect_status)
+                    .header("Location", server2.url(TARGET_URL));
+            });
 
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
+            let logger = slog::Logger::root(slog::Discard, slog::o!());
+            let fetcher = HttpFetcher::new(logger);
 
-        let fetcher = HttpFetcher::new(logger);
+            let url = server1.url(INITIAL_URL);
+            let url = url::Url::parse(&url).unwrap();
 
-        let url = server1.url(INITIAL_URL);
-        let url = url::Url::parse(&url).unwrap();
+            let result = fetcher.get(&url, None);
 
-        let result = fetcher.get(&url, None);
+            mock_redirect.assert();
 
-        mock_redirect.assert();
-
-        assert!(matches!(result, Err(HttpFetcherError::Moved(_))));
-        if let Err(HttpFetcherError::Moved(redir)) = result {
-            assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
-            assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
+            assert!(matches!(result, Err(HttpFetcherError::Moved(_))));
+            if let Err(HttpFetcherError::Moved(redir)) = result {
+                assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
+                assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
+            }
         }
     }
 
@@ -593,113 +602,6 @@ mod test {
         if let Err(HttpFetcherError::Moving(redir)) = result {
             assert_eq!(redir.from.as_str(), server.url("/r1"));
             assert_eq!(redir.to.as_str(), server.url("/r11"));
-        }
-    }
-
-    #[test]
-    fn get_handles_303_see_other() {
-        use httpmock::prelude::*;
-
-        const INITIAL_URL: &str = "/initial";
-        const FINAL_URL: &str = "/final";
-        const STATUS_FINAL: u16 = 200;
-        const BODY: &str = "Redirected with 303.";
-
-        let server = MockServer::start();
-
-        let mock_redirect = server.mock(|when, then| {
-            when.method("GET").path(INITIAL_URL);
-            then.status(303).header("Location", server.url(FINAL_URL));
-        });
-
-        let mock_final = server.mock(|when, then| {
-            when.method("GET").path(FINAL_URL);
-            then.status(STATUS_FINAL).body(BODY);
-        });
-
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
-        let fetcher = HttpFetcher::new(logger);
-
-        let url = server.url(INITIAL_URL);
-        let url = url::Url::parse(&url).unwrap();
-
-        let response = fetcher.get(&url, None).unwrap();
-
-        mock_redirect.assert();
-        mock_final.assert();
-
-        assert_eq!(response.get_url(), server.url(FINAL_URL));
-        assert_eq!(response.status(), STATUS_FINAL);
-        assert_eq!(response.into_string().unwrap(), BODY);
-    }
-
-    #[test]
-    fn get_handles_307_temporary_redirect() {
-        use httpmock::prelude::*;
-
-        const INITIAL_URL: &str = "/initial";
-        const FINAL_URL: &str = "/final";
-        const STATUS_FINAL: u16 = 200;
-        const BODY: &str = "Redirected with 307.";
-
-        let server = MockServer::start();
-
-        let mock_redirect = server.mock(|when, then| {
-            when.method("GET").path(INITIAL_URL);
-            then.status(307).header("Location", server.url(FINAL_URL));
-        });
-
-        let mock_final = server.mock(|when, then| {
-            when.method("GET").path(FINAL_URL);
-            then.status(STATUS_FINAL).body(BODY);
-        });
-
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
-        let fetcher = HttpFetcher::new(logger);
-
-        let url = server.url(INITIAL_URL);
-        let url = url::Url::parse(&url).unwrap();
-
-        let response = fetcher.get(&url, None).unwrap();
-
-        mock_redirect.assert();
-        mock_final.assert();
-
-        assert_eq!(response.get_url(), server.url(FINAL_URL));
-        assert_eq!(response.status(), STATUS_FINAL);
-        assert_eq!(response.into_string().unwrap(), BODY);
-    }
-
-    #[test]
-    fn get_handles_308_permanent_redirect() {
-        use httpmock::prelude::*;
-
-        const INITIAL_URL: &str = "/initial";
-        const TARGET_URL: &str = "/target";
-
-        let server1 = MockServer::start();
-        let server2 = MockServer::start();
-
-        let mock_redirect = server1.mock(|when, then| {
-            when.method("GET").path(INITIAL_URL);
-            then.status(308).header("Location", server2.url(TARGET_URL));
-        });
-
-        let logger = slog::Logger::root(slog::Discard, slog::o!());
-
-        let fetcher = HttpFetcher::new(logger);
-
-        let url = server1.url(INITIAL_URL);
-        let url = url::Url::parse(&url).unwrap();
-
-        let result = fetcher.get(&url, None);
-
-        mock_redirect.assert();
-
-        assert!(matches!(result, Err(HttpFetcherError::Moved(_))));
-        if let Err(HttpFetcherError::Moved(redir)) = result {
-            assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
-            assert_eq!(redir.to.as_str(), server2.url(TARGET_URL));
         }
     }
 
