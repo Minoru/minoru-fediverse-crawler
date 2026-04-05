@@ -279,18 +279,20 @@ mod test {
     }
 
     #[test]
-    fn get_follows_temporary_redirect_same_origin_all_codes() {
+    fn get_follows_redirect_same_origin_all_codes() {
         use httpmock::prelude::*;
 
         const INITIAL_URL: &str = "/initial";
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
 
-        // Test all temporary redirect codes (302, 303, 307)
+        // Test all redirect codes (301, 302, 303, 307, 308)
         for (redirect_status, body) in [
+            (301, "Redirected with 301."),
             (302, "Redirected with 302."),
             (303, "Redirected with 303."),
             (307, "Redirected with 307."),
+            (308, "Redirected with 308."),
         ] {
             let server = MockServer::start();
 
