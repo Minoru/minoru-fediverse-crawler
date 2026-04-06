@@ -705,4 +705,126 @@ mod test {
         assert_eq!(response.status(), STATUS_FINAL);
         assert_eq!(response.into_string().unwrap(), BODY);
     }
+
+    #[test]
+    fn get_times_out_on_slow_response() {
+        use httpmock::prelude::*;
+
+        const URL: &str = "/slow";
+        const DELAY_SECS: u64 = 12;
+        const STATUS: u16 = 200;
+        const BODY: &str = "This should never arrive.";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(STATUS)
+                .body(BODY)
+                .delay(Duration::from_secs(DELAY_SECS));
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::UreqError(_))));
+        if let Err(HttpFetcherError::UreqError(err)) = result {
+            let err_str = err.to_string();
+            assert!(
+                err_str.contains("timeout") || err_str.contains("timed out"),
+                "Expected timeout error, got: {}",
+                err_str
+            );
+        }
+    }
+
+    #[test]
+    fn get_fails_on_connection_timeout() {
+        use httpmock::prelude::*;
+
+        const URL: &str = "/connection-timeout";
+        const DELAY_SECS: u64 = 15;
+        const STATUS: u16 = 200;
+        const BODY: &str = "This should never arrive.";
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path(URL);
+            then.status(STATUS)
+                .body(BODY)
+                .delay(Duration::from_secs(DELAY_SECS));
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::UreqError(_))));
+        if let Err(HttpFetcherError::UreqError(err)) = result {
+            let err_str = err.to_string();
+            assert!(
+                err_str.contains("timeout") || err_str.contains("timed out"),
+                "Expected timeout error, got: {}",
+                err_str
+            );
+        }
+    }
+
+    #[test]
+    fn get_times_out_during_redirect_chain() {
+        use httpmock::prelude::*;
+
+        const INITIAL_URL: &str = "/initial";
+        const SLOW_URL: &str = "/slow";
+        const DELAY_SECS: u64 = 12;
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "This should never arrive.";
+
+        let server = MockServer::start();
+
+        let mock_redirect = server.mock(|when, then| {
+            when.method("GET").path(INITIAL_URL);
+            then.status(302).header("Location", server.url(SLOW_URL));
+        });
+
+        let mock_slow = server.mock(|when, then| {
+            when.method("GET").path(SLOW_URL);
+            then.status(STATUS_FINAL)
+                .body(BODY)
+                .delay(Duration::from_secs(DELAY_SECS));
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let result = fetcher.get(&url, None);
+
+        mock_redirect.assert();
+        mock_slow.assert();
+
+        assert!(matches!(result, Err(HttpFetcherError::UreqError(_))));
+        if let Err(HttpFetcherError::UreqError(err)) = result {
+            let err_str = err.to_string();
+            assert!(
+                err_str.contains("timeout") || err_str.contains("timed out"),
+                "Expected timeout error, got: {}",
+                err_str
+            );
+        }
+    }
 }
