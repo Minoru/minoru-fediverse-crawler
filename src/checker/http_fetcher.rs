@@ -1,4 +1,4 @@
-use slog::{error, Logger};
+use slog::{Logger, error};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
@@ -361,7 +361,7 @@ mod test {
     }
 
     #[test]
-    fn get_returns_moved_error_on_permanent_redirect_no_follow_all_codes() {
+    fn get_returns_moved_error_on_permanent_redirect_different_origin_all_codes() {
         use httpmock::prelude::*;
 
         const INITIAL_URL: &str = "/initial";
