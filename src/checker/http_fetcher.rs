@@ -97,9 +97,7 @@ fn get_with_type_ignoring_404(
     let mut current_url = url.to_owned();
     let mut response;
     loop {
-        let mut request = agent
-            .get(current_url.as_str())
-            .timeout(Duration::from_secs(10));
+        let mut request = agent.get(current_url.as_str());
         if let Some(t) = acceptable_type {
             request = request.set("Accept", t);
         }
@@ -711,7 +709,7 @@ mod test {
         use httpmock::prelude::*;
 
         const URL: &str = "/slow";
-        const DELAY_SECS: u64 = 12;
+        const DELAY_SECS: u64 = 35;
         const STATUS: u16 = 200;
         const BODY: &str = "This should never arrive.";
 
@@ -746,40 +744,30 @@ mod test {
 
     #[test]
     fn get_fails_on_connection_timeout() {
-        use httpmock::prelude::*;
-
-        const URL: &str = "/connection-timeout";
-        const DELAY_SECS: u64 = 15;
-        const STATUS: u16 = 200;
-        const BODY: &str = "This should never arrive.";
-
-        let server = MockServer::start();
-        let mock = server.mock(|when, then| {
-            when.method("GET").path(URL);
-            then.status(STATUS)
-                .body(BODY)
-                .delay(Duration::from_secs(DELAY_SECS));
-        });
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
 
         let logger = slog::Logger::root(slog::Discard, slog::o!());
         let fetcher = HttpFetcher::new(logger);
 
-        let url = server.url(URL);
-        let url = url::Url::parse(&url).unwrap();
+        let url = Url::parse(&format!("http://127.0.0.1:{port}/connection-timeout")).unwrap();
 
+        let start = std::time::Instant::now();
         let result = fetcher.get(&url, None);
+        let elapsed = start.elapsed();
 
-        mock.assert();
+        drop(listener);
 
         assert!(matches!(result, Err(HttpFetcherError::UreqError(_))));
         if let Err(HttpFetcherError::UreqError(err)) = result {
-            let err_str = err.to_string();
-            assert!(
-                err_str.contains("timeout") || err_str.contains("timed out"),
-                "Expected timeout error, got: {}",
-                err_str
-            );
+            assert_eq!(err.kind(), ureq::ErrorKind::Io);
         }
+
+        assert!(
+            elapsed >= Duration::from_secs(29),
+            "Expected connection timeout to take at least 29s, but only took {:?}",
+            elapsed
+        );
     }
 
     #[test]
@@ -788,7 +776,7 @@ mod test {
 
         const INITIAL_URL: &str = "/initial";
         const SLOW_URL: &str = "/slow";
-        const DELAY_SECS: u64 = 12;
+        const DELAY_SECS: u64 = 35;
         const STATUS_FINAL: u16 = 200;
         const BODY: &str = "This should never arrive.";
 
