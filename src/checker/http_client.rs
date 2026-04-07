@@ -1,5 +1,5 @@
 //! HTTP client that automatically checks requests against robots.txt.
-use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, Redirection};
+use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, IHttpFetcher, Redirection};
 use slog::{Logger, info};
 use url::{Host, Url};
 
@@ -95,14 +95,14 @@ impl From<HttpFetcherError> for HttpClientError {
     }
 }
 
-pub struct HttpClient {
-    fetcher: HttpFetcher,
+pub struct HttpClient<FetcherT: IHttpFetcher = HttpFetcher> {
+    fetcher: FetcherT,
     robots_txt: String,
 }
 
-impl HttpClient {
+impl<FetcherT: IHttpFetcher> HttpClient<FetcherT> {
     pub fn new(logger: Logger, host: Host) -> Result<Self, HttpClientError> {
-        let fetcher = HttpFetcher::new(logger.clone());
+        let fetcher = FetcherT::new(logger.clone());
         let robots_txt = {
             let url = format!("https://{host}/robots.txt");
             let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
