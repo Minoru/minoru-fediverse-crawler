@@ -66,7 +66,7 @@ impl HttpFetcher {
         let inner = ureq::AgentBuilder::new()
             // We'll handle redirects ourselves
             .redirects(0)
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(10))
             .user_agent(USER_AGENT_FULL)
             .build();
 
@@ -764,8 +764,8 @@ mod test {
         }
 
         assert!(
-            elapsed >= Duration::from_secs(29),
-            "Expected connection timeout to take at least 29s, but only took {:?}",
+            elapsed >= Duration::from_secs(9),
+            "Expected connection timeout to take at least 9s, but only took {:?}",
             elapsed
         );
     }
