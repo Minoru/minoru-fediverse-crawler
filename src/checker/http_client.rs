@@ -106,7 +106,7 @@ impl HttpClient {
         Self::with_fetcher(fetcher, logger, host)
     }
 
-    pub fn with_fetcher(
+    fn with_fetcher(
         fetcher: Box<dyn IHttpFetcher>,
         logger: Logger,
         host: Host,
@@ -145,5 +145,37 @@ impl HttpClient {
         use robotstxt::DefaultMatcher;
         let mut matcher = DefaultMatcher::default();
         matcher.one_agent_allowed_by_robots(&self.robots_txt, USER_AGENT_TOKEN, url)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod test {
+    use super::*;
+    use crate::checker::http_fetcher::MockIHttpFetcher;
+
+    #[test]
+    fn constructor_requests_robots_txt() {
+        let host = Host::parse("example.com").unwrap();
+        let expected_url = Url::parse("https://example.com/robots.txt").unwrap();
+
+        let mut fetcher = Box::new(MockIHttpFetcher::new());
+        fetcher
+            .expect_get()
+            .with(
+                mockall::predicate::eq(expected_url),
+                mockall::predicate::always(),
+            )
+            .once()
+            .returning(|_url, _accept_header| {
+                let ureq_404 = Box::new(ureq::Error::Status(
+                    404,
+                    ureq::Response::new(404, "Not found", "").unwrap(),
+                ));
+                Err(HttpFetcherError::UreqError(ureq_404))
+            });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let _client = HttpClient::with_fetcher(fetcher, logger, host);
     }
 }

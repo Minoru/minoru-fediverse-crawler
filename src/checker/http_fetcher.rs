@@ -54,11 +54,12 @@ impl std::error::Error for HttpFetcherError {
     }
 }
 
+#[mockall::automock]
 pub(super) trait IHttpFetcher {
-    fn get(
+    fn get<'a>(
         &self,
-        url: &Url,
-        accept_header: Option<&str>,
+        url: &'a Url,
+        accept_header: Option<&'a str>,
     ) -> Result<ureq::Response, HttpFetcherError>;
 }
 
