@@ -54,6 +54,14 @@ impl std::error::Error for HttpFetcherError {
     }
 }
 
+pub(super) trait IHttpFetcher {
+    fn get(
+        &self,
+        url: &Url,
+        accept_header: Option<&str>,
+    ) -> Result<ureq::Response, HttpFetcherError>;
+}
+
 pub(super) struct HttpFetcher {
     logger: Logger,
     inner: Agent,
@@ -79,6 +87,16 @@ impl HttpFetcher {
         accept_header: Option<&str>,
     ) -> Result<ureq::Response, HttpFetcherError> {
         get_with_type_ignoring_404(&self.logger, &self.inner, url, accept_header)
+    }
+}
+
+impl IHttpFetcher for HttpFetcher {
+    fn get(
+        &self,
+        url: &Url,
+        accept_header: Option<&str>,
+    ) -> Result<ureq::Response, HttpFetcherError> {
+        self.get(url, accept_header)
     }
 }
 
