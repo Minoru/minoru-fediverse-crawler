@@ -207,4 +207,48 @@ mod test {
 
         assert!(matches!(result, Err(HttpClientError::UreqError(_))));
     }
+
+    #[test]
+    fn empty_robots_txt_allows_any_request() {
+        use crate::checker::http_fetcher::{HttpFetcherError, MockIHttpFetcher};
+
+        let host = Host::parse("example.com").unwrap();
+        let robots_url = Url::parse("https://example.com/robots.txt").unwrap();
+        let target_url = Url::parse("https://example.com/feed.atom").unwrap();
+
+        let mut fetcher = Box::new(MockIHttpFetcher::new());
+
+        // First call: fetch robots.txt (returns empty string)
+        fetcher
+            .expect_get()
+            .with(
+                mockall::predicate::eq(robots_url),
+                mockall::predicate::always(),
+            )
+            .once()
+            .returning(|_url, _accept_header| Ok(ureq::Response::new(200, "OK", "").unwrap()));
+
+        // Second call: fetch the target URL (returns 404)
+        fetcher
+            .expect_get()
+            .with(
+                mockall::predicate::eq(target_url.clone()),
+                mockall::predicate::always(),
+            )
+            .once()
+            .returning(|_url, _accept_header| {
+                let ureq_404 = Box::new(ureq::Error::Status(
+                    404,
+                    ureq::Response::new(404, "Not found", "").unwrap(),
+                ));
+                Err(HttpFetcherError::UreqError(ureq_404))
+            });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let client = HttpClient::with_fetcher(fetcher, logger.clone(), host).unwrap();
+
+        // The request should not be forbidden by robots.txt (error should be UreqError, not ForbiddenByRobotsTxt)
+        let result = client.get(&target_url);
+        assert!(matches!(result, Err(HttpClientError::UreqError(_))));
+    }
 }
