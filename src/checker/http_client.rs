@@ -1,6 +1,6 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, IHttpFetcher, Redirection};
-use slog::{Logger, info};
+use slog::{info, Logger};
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
@@ -177,5 +177,34 @@ mod test {
 
         let logger = slog::Logger::root(slog::Discard, slog::o!());
         let _client = HttpClient::with_fetcher(fetcher, logger, host);
+    }
+
+    #[test]
+    fn constructor_propagates_ureq_error_when_fetching_robots_txt() {
+        use crate::checker::http_fetcher::{HttpFetcherError, MockIHttpFetcher};
+
+        let host = Host::parse("example.com").unwrap();
+        let expected_url = Url::parse("https://example.com/robots.txt").unwrap();
+
+        let mut fetcher = Box::new(MockIHttpFetcher::new());
+        fetcher
+            .expect_get()
+            .with(
+                mockall::predicate::eq(expected_url),
+                mockall::predicate::always(),
+            )
+            .once()
+            .returning(|_url, _accept_header| {
+                let ureq_err = Box::new(ureq::Error::Status(
+                    403,
+                    ureq::Response::new(403, "Forbidden", "").unwrap(),
+                ));
+                Err(HttpFetcherError::UreqError(ureq_err))
+            });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let result = HttpClient::with_fetcher(fetcher, logger, host);
+
+        assert!(matches!(result, Err(HttpClientError::UreqError(_))));
     }
 }
