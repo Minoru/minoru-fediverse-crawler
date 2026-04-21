@@ -1,6 +1,6 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, IHttpFetcher, Redirection};
-use slog::{info, Logger};
+use slog::{Logger, info};
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
@@ -250,5 +250,38 @@ mod test {
         // The request should not be forbidden by robots.txt (error should be UreqError, not ForbiddenByRobotsTxt)
         let result = client.get(&target_url);
         assert!(matches!(result, Err(HttpClientError::UreqError(_))));
+    }
+
+    #[test]
+    fn robots_txt_forbidding_all_requests_returns_error() {
+        use crate::checker::http_fetcher::MockIHttpFetcher;
+
+        let host = Host::parse("example.com").unwrap();
+        let robots_url = Url::parse("https://example.com/robots.txt").unwrap();
+        let target_url = Url::parse("https://example.com/feed.atom").unwrap();
+
+        let mut fetcher = Box::new(MockIHttpFetcher::new());
+
+        // First call: fetch robots.txt (returns Disallow: /)
+        fetcher
+            .expect_get()
+            .with(
+                mockall::predicate::eq(robots_url),
+                mockall::predicate::always(),
+            )
+            .once()
+            .returning(|_url, _accept_header| {
+                Ok(ureq::Response::new(200, "OK", "User-agent: *\nDisallow: /\n").unwrap())
+            });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let client = HttpClient::with_fetcher(fetcher, logger.clone(), host).unwrap();
+
+        // The request should be forbidden by robots.txt
+        let result = client.get(&target_url);
+        assert!(matches!(
+            result,
+            Err(HttpClientError::ForbiddenByRobotsTxt(_))
+        ));
     }
 }
