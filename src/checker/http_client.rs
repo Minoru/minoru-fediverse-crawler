@@ -152,7 +152,7 @@ impl HttpClient {
 #[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
-    use crate::checker::http_fetcher::MockIHttpFetcher;
+    use crate::checker::http_fetcher::{HttpFetcherError, MockIHttpFetcher};
 
     #[test]
     fn constructor_requests_robots_txt() {
@@ -181,8 +181,6 @@ mod test {
 
     #[test]
     fn constructor_propagates_ureq_error_when_fetching_robots_txt() {
-        use crate::checker::http_fetcher::{HttpFetcherError, MockIHttpFetcher};
-
         let host = Host::parse("example.com").unwrap();
         let expected_url = Url::parse("https://example.com/robots.txt").unwrap();
 
@@ -210,8 +208,6 @@ mod test {
 
     #[test]
     fn empty_robots_txt_allows_any_request() {
-        use crate::checker::http_fetcher::{HttpFetcherError, MockIHttpFetcher};
-
         let host = Host::parse("example.com").unwrap();
         let robots_url = Url::parse("https://example.com/robots.txt").unwrap();
         let target_url = Url::parse("https://example.com/feed.atom").unwrap();
@@ -254,8 +250,6 @@ mod test {
 
     #[test]
     fn robots_txt_forbidding_all_requests_returns_error() {
-        use crate::checker::http_fetcher::MockIHttpFetcher;
-
         let host = Host::parse("example.com").unwrap();
         let robots_url = Url::parse("https://example.com/robots.txt").unwrap();
         let target_url = Url::parse("https://example.com/feed.atom").unwrap();
