@@ -24,5 +24,8 @@ tempfile = { version = "3", default-features = false }
 addr = { version = "0.15", default-features = false, features = [ "psl" ] }
 flate2 = { version = "1", default-features = false }
 
+# GHSA-965h-392x-2mh5, GHSA-965h-392x-2mh5
+rustls-webpki = "0.103.12"
+
 [profile.release]
 lto = "fat"
