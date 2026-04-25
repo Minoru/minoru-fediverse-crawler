@@ -81,14 +81,6 @@ impl HttpFetcher {
 
         Self { logger, inner }
     }
-
-    pub(super) fn get(
-        &self,
-        url: &Url,
-        accept_header: Option<&str>,
-    ) -> Result<ureq::Response, HttpFetcherError> {
-        get_with_type_ignoring_404(&self.logger, &self.inner, url, accept_header)
-    }
 }
 
 impl IHttpFetcher for HttpFetcher {
@@ -97,65 +89,56 @@ impl IHttpFetcher for HttpFetcher {
         url: &Url,
         accept_header: Option<&str>,
     ) -> Result<ureq::Response, HttpFetcherError> {
-        self.get(url, accept_header)
+        // Our redirect policy is:
+        // - follow redirects as long as they point to the same hostname:port, and schema didn't
+        //   change
+        // - stop after 10 redirects
+        const REDIRECTS_LIMIT: u8 = 10;
+        let mut redirects_left = REDIRECTS_LIMIT;
+        let mut current_url = url.to_owned();
+        let mut response;
+        loop {
+            let mut request = self.inner.get(current_url.as_str());
+            if let Some(t) = accept_header {
+                request = request.set("Accept", t);
+            }
+
+            match request.call() {
+                Ok(r) => response = r,
+                Err(ureq::Error::Status(404, r)) => response = r,
+                Err(e) => return Err(HttpFetcherError::UreqError(Box::new(e))),
+            }
+            if !is_redirect(response.status()) {
+                break;
+            }
+
+            // invariant: response's status is a redirect code
+
+            let to = response
+                .header("location")
+                .and_then(|h| Url::parse(h).ok())
+                .ok_or_else(|| HttpFetcherError::NoLocationHeader(current_url.clone()))?;
+
+            redirects_left = redirects_left.saturating_sub(1);
+            if redirects_left == 0 {
+                break;
+            }
+
+            if !is_same_origin(&to, &current_url) {
+                error!(
+                    self.logger,
+                    "Redirect points to {} which is of different origin than {}; stopping here",
+                    to,
+                    current_url
+                );
+                break;
+            }
+
+            current_url = to;
+        }
+        redirect_into_error(url, &response)?;
+        Ok(response)
     }
-}
-
-fn get_with_type_ignoring_404(
-    logger: &Logger,
-    agent: &Agent,
-    url: &Url,
-    acceptable_type: Option<&str>,
-) -> Result<ureq::Response, HttpFetcherError> {
-    // Our redirect policy is:
-    // - follow redirects as long as they point to the same hostname:port, and schema didn't
-    //   change
-    // - stop after 10 redirects
-    const REDIRECTS_LIMIT: u8 = 10;
-    let mut redirects_left = REDIRECTS_LIMIT;
-    let mut current_url = url.to_owned();
-    let mut response;
-    loop {
-        let mut request = agent.get(current_url.as_str());
-        if let Some(t) = acceptable_type {
-            request = request.set("Accept", t);
-        }
-
-        match request.call() {
-            Ok(r) => response = r,
-            Err(ureq::Error::Status(404, r)) => response = r,
-            Err(e) => return Err(HttpFetcherError::UreqError(Box::new(e))),
-        }
-        if !is_redirect(response.status()) {
-            break;
-        }
-
-        // invariant: response's status is a redirect code
-
-        let to = response
-            .header("location")
-            .and_then(|h| Url::parse(h).ok())
-            .ok_or_else(|| HttpFetcherError::NoLocationHeader(current_url.clone()))?;
-
-        redirects_left = redirects_left.saturating_sub(1);
-        if redirects_left == 0 {
-            break;
-        }
-
-        if !is_same_origin(&to, &current_url) {
-            error!(
-                logger,
-                "Redirect points to {} which is of different origin that {}; stopping here",
-                to,
-                current_url
-            );
-            break;
-        }
-
-        current_url = to;
-    }
-    redirect_into_error(url, &response)?;
-    Ok(response)
 }
 
 fn is_temporary_redirect(status: u16) -> bool {

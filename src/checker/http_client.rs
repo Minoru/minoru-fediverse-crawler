@@ -111,16 +111,14 @@ impl HttpClient {
         logger: Logger,
         host: Host,
     ) -> Result<Self, HttpClientError> {
-        let robots_txt = {
-            let url = format!("https://{host}/robots.txt");
-            let url = Url::parse(&url).map_err(HttpClientError::UrlParseError)?;
-            info!(logger, "Fetching robots.txt");
-            fetcher
-                .get(&url, None)
-                .map_err(HttpClientError::from)?
-                .into_string()
-                .map_err(HttpClientError::UreqStdError)?
-        };
+        let robots_url = format!("https://{host}/robots.txt");
+        let robots_url = Url::parse(&robots_url).map_err(HttpClientError::UrlParseError)?;
+        info!(logger, "Fetching robots.txt");
+        let robots_txt = fetcher
+            .get(&robots_url, None)
+            .map_err(HttpClientError::from)?
+            .into_string()
+            .map_err(HttpClientError::UreqStdError)?;
         Ok(Self {
             fetcher,
             robots_txt,
