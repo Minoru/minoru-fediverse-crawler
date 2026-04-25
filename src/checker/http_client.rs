@@ -166,15 +166,11 @@ mod test {
             )
             .once()
             .returning(|_url, _accept_header| {
-                let ureq_404 = Box::new(ureq::Error::Status(
-                    404,
-                    ureq::Response::new(404, "Not found", "").unwrap(),
-                ));
-                Err(HttpFetcherError::UreqError(ureq_404))
+                Ok(ureq::Response::new(404, "Not found", "").unwrap())
             });
 
         let logger = slog::Logger::root(slog::Discard, slog::o!());
-        let _client = HttpClient::with_fetcher(fetcher, logger, host);
+        let _client = HttpClient::with_fetcher(fetcher, logger, host).unwrap();
     }
 
     #[test]
