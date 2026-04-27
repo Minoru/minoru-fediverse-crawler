@@ -1,6 +1,6 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, IHttpFetcher, Redirection};
-use slog::{Logger, info};
+use slog::{info, Logger};
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
@@ -198,7 +198,7 @@ mod test {
     fn empty_robots_txt_allows_any_request() {
         let host = Host::parse("example.com").unwrap();
         let robots_url = Url::parse("https://example.com/robots.txt").unwrap();
-        let target_url = Url::parse("https://example.com/feed.atom").unwrap();
+        let target_url = Url::parse("https://example.com/api/v1/instance").unwrap();
 
         let mut fetcher = Box::new(MockIHttpFetcher::new());
 
@@ -209,7 +209,7 @@ mod test {
             .once()
             .returning(|_url, _accept_header| Ok(ureq::Response::new(200, "OK", "").unwrap()));
 
-        // Second call: fetch the target URL (returns 404)
+        // Second call: fetch the target URL with Accept: application/json (returns 404)
         let target_url_clone = target_url.clone();
         fetcher
             .expect_get()
