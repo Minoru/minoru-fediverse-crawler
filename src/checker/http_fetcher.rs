@@ -319,7 +319,6 @@ mod test {
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
 
-        // Test all redirect codes (301, 302, 303, 307, 308)
         for (redirect_status, body) in [
             (301, "Redirected with 301."),
             (302, "Redirected with 302."),
@@ -364,7 +363,6 @@ mod test {
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
-        // Test all temporary redirect codes (302, 303, 307)
         for redirect_status in [302, 303, 307] {
             let server1 = MockServer::start();
             let server2 = MockServer::start();
@@ -400,7 +398,6 @@ mod test {
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
-        // Test all permanent redirect codes (301, 308)
         for redirect_status in [301, 308] {
             let server1 = MockServer::start();
             let server2 = MockServer::start();
@@ -436,7 +433,6 @@ mod test {
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
-        // Test all redirect codes (301, 302, 303, 307, 308)
         for redirect_status in [301, 302, 303, 307, 308] {
             let server1 = MockServer::start();
             let server2 = MockServer::start();
@@ -484,7 +480,6 @@ mod test {
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
-        // Test all redirect codes (301, 302, 303, 307, 308)
         for redirect_status in [301, 302, 303, 307, 308] {
             let server1 = MockServer::start();
             let server2 = MockServer::start();

@@ -253,7 +253,6 @@ mod test {
         let logger = slog::Logger::root(slog::Discard, slog::o!());
         let client = HttpClient::with_fetcher(fetcher, logger.clone(), host).unwrap();
 
-        // The request should be forbidden by robots.txt
         let result = client.get(&target_url);
         assert!(matches!(
             result,
