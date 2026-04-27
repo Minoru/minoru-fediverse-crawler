@@ -1,4 +1,4 @@
-use slog::{error, Logger};
+use slog::{Logger, error};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
@@ -194,6 +194,7 @@ fn is_same_origin(lhs: &Url, rhs: &Url) -> bool {
 #[allow(clippy::unwrap_used)]
 mod test {
     use super::*;
+    use httpmock::prelude::*;
 
     #[test]
     fn test_origin() {
@@ -217,8 +218,6 @@ mod test {
 
     #[test]
     fn get_fetches_given_url() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/my-path/for_testing";
         const STATUS: u16 = 200;
         const BODY: &str = "All is well.";
@@ -247,8 +246,6 @@ mod test {
 
     #[test]
     fn get_sends_user_agent_header() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/my-path/for_testing";
         const STATUS: u16 = 200;
         const BODY: &str = "All is well.";
@@ -280,8 +277,6 @@ mod test {
 
     #[test]
     fn get_adds_accept_header_when_provided() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/my-path/for_testing";
         const STATUS: u16 = 200;
         const BODY: &str = "All is well.";
@@ -313,8 +308,6 @@ mod test {
 
     #[test]
     fn get_follows_redirect_same_origin_all_codes() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
@@ -358,8 +351,6 @@ mod test {
 
     #[test]
     fn get_returns_moving_error_on_temporary_redirect_different_origin_all_codes() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
@@ -393,8 +384,6 @@ mod test {
 
     #[test]
     fn get_returns_moved_error_on_permanent_redirect_different_origin_all_codes() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
@@ -428,8 +417,6 @@ mod test {
 
     #[test]
     fn get_stops_on_redirect_to_different_schema() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
@@ -475,8 +462,6 @@ mod test {
 
     #[test]
     fn get_stops_on_redirect_to_different_port() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const TARGET_URL: &str = "/target";
 
@@ -519,8 +504,6 @@ mod test {
 
     #[test]
     fn get_returns_no_location_header_error() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/redirect-no-location";
 
         let server = MockServer::start();
@@ -548,8 +531,6 @@ mod test {
 
     #[test]
     fn get_handles_invalid_location_url() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/redirect-invalid-location";
 
         let server = MockServer::start();
@@ -577,8 +558,6 @@ mod test {
 
     #[test]
     fn get_follows_redirect_chain_up_to_limit() {
-        use httpmock::prelude::*;
-
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
         const BODY: &str = "End of chain.";
@@ -628,8 +607,6 @@ mod test {
 
     #[test]
     fn get_stops_after_10_redirects() {
-        use httpmock::prelude::*;
-
         let server = MockServer::start();
 
         let mut mocks = Vec::new();
@@ -664,8 +641,6 @@ mod test {
 
     #[test]
     fn get_returns_404_as_ordinary_response_not_an_error() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/missing";
         const STATUS: u16 = 404;
         const BODY: &str = "Not Found";
@@ -694,8 +669,6 @@ mod test {
 
     #[test]
     fn get_preserves_accept_header_across_redirects() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const FINAL_URL: &str = "/final";
         const STATUS_FINAL: u16 = 200;
@@ -736,8 +709,6 @@ mod test {
 
     #[test]
     fn get_times_out_on_slow_response() {
-        use httpmock::prelude::*;
-
         const URL: &str = "/slow";
         const DELAY_SECS: u64 = 35;
         const STATUS: u16 = 200;
@@ -802,8 +773,6 @@ mod test {
 
     #[test]
     fn get_times_out_during_redirect_chain() {
-        use httpmock::prelude::*;
-
         const INITIAL_URL: &str = "/initial";
         const SLOW_URL: &str = "/slow";
         const DELAY_SECS: u64 = 35;

@@ -1,6 +1,6 @@
 //! HTTP client that automatically checks requests against robots.txt.
 use crate::checker::http_fetcher::{HttpFetcher, HttpFetcherError, IHttpFetcher, Redirection};
-use slog::{info, Logger};
+use slog::{Logger, info};
 use url::{Host, Url};
 
 /// The string to be matched against "User-agent" in robots.txt
