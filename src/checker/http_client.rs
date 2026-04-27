@@ -160,10 +160,7 @@ mod test {
         let mut fetcher = Box::new(MockIHttpFetcher::new());
         fetcher
             .expect_get()
-            .with(
-                mockall::predicate::eq(expected_url),
-                mockall::predicate::always(),
-            )
+            .withf(move |url, accept_header| url == &expected_url && accept_header.is_none())
             .once()
             .returning(|_url, _accept_header| {
                 Ok(ureq::Response::new(404, "Not found", "").unwrap())
@@ -181,10 +178,7 @@ mod test {
         let mut fetcher = Box::new(MockIHttpFetcher::new());
         fetcher
             .expect_get()
-            .with(
-                mockall::predicate::eq(expected_url),
-                mockall::predicate::always(),
-            )
+            .withf(move |url, accept_header| url == &expected_url && accept_header.is_none())
             .once()
             .returning(|_url, _accept_header| {
                 let ureq_err = Box::new(ureq::Error::Status(
@@ -211,20 +205,17 @@ mod test {
         // First call: fetch robots.txt (returns empty string)
         fetcher
             .expect_get()
-            .with(
-                mockall::predicate::eq(robots_url),
-                mockall::predicate::always(),
-            )
+            .withf(move |url, accept_header| url == &robots_url && accept_header.is_none())
             .once()
             .returning(|_url, _accept_header| Ok(ureq::Response::new(200, "OK", "").unwrap()));
 
         // Second call: fetch the target URL (returns 404)
+        let target_url_clone = target_url.clone();
         fetcher
             .expect_get()
-            .with(
-                mockall::predicate::eq(target_url.clone()),
-                mockall::predicate::always(),
-            )
+            .withf(move |url, accept_header| {
+                url == &target_url_clone && *accept_header == Some("application/json")
+            })
             .once()
             .returning(|_url, _accept_header| {
                 let ureq_404 = Box::new(ureq::Error::Status(
@@ -253,10 +244,7 @@ mod test {
         // First call: fetch robots.txt (returns Disallow: /)
         fetcher
             .expect_get()
-            .with(
-                mockall::predicate::eq(robots_url),
-                mockall::predicate::always(),
-            )
+            .withf(move |url, accept_header| url == &robots_url && accept_header.is_none())
             .once()
             .returning(|_url, _accept_header| {
                 Ok(ureq::Response::new(200, "OK", "User-agent: *\nDisallow: /\n").unwrap())
