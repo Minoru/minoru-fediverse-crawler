@@ -1,4 +1,4 @@
-use slog::{Logger, error};
+use slog::{error, Logger};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
@@ -54,7 +54,7 @@ impl std::error::Error for HttpFetcherError {
     }
 }
 
-#[mockall::automock]
+#[cfg_attr(test, mockall::automock)]
 pub(super) trait IHttpFetcher {
     fn get<'a>(
         &self,
