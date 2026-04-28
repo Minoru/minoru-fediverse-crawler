@@ -762,7 +762,7 @@ mod test {
         if let Err(HttpFetcherError::UreqError(err)) = result {
             let err_str = err.to_string();
             assert!(
-                err_str.contains("timeout") || err_str.contains("timed out"),
+                err_str.contains("timed out"),
                 "Expected timeout error, got: {}",
                 err_str
             );
@@ -832,7 +832,7 @@ mod test {
         if let Err(HttpFetcherError::UreqError(err)) = result {
             let err_str = err.to_string();
             assert!(
-                err_str.contains("timeout") || err_str.contains("timed out"),
+                err_str.contains("timed out"),
                 "Expected timeout error, got: {}",
                 err_str
             );
