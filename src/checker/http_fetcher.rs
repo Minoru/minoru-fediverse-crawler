@@ -1,4 +1,4 @@
-use slog::{Logger, error};
+use slog::{error, Logger};
 use std::time::Duration;
 use ureq::Agent;
 use url::Url;
@@ -421,23 +421,27 @@ mod test {
         const TARGET_URL: &str = "/target";
 
         for redirect_status in [301, 302, 303, 307, 308] {
-            let server1 = MockServer::start();
-            let server2 = MockServer::start();
+            let server = MockServer::start();
 
-            let server2_url = server2.url(TARGET_URL);
-            let http_location = server2_url.replace("https://", "http://");
+            // httpmock's MockServer::start() returns http:// URLs, so we flip to https://
+            let server_url = server.url(TARGET_URL);
+            assert!(
+                server_url.starts_with("http://"),
+                "expected http:// URL, got: {server_url}"
+            );
+            let https_location = server_url.replace("http://", "https://");
 
-            let mock_redirect = server1.mock(|when, then| {
+            let mock_redirect = server.mock(|when, then| {
                 when.method("GET").path(INITIAL_URL);
                 then.status(redirect_status)
-                    .header("Location", &http_location);
+                    .header("Location", &https_location);
             });
 
             let logger = slog::Logger::root(slog::Discard, slog::o!());
 
             let fetcher = HttpFetcher::new(logger);
 
-            let url = server1.url(INITIAL_URL);
+            let url = server.url(INITIAL_URL);
             let url = url::Url::parse(&url).unwrap();
 
             let result = fetcher.get(&url, None);
@@ -447,14 +451,14 @@ mod test {
             if is_temporary_redirect(redirect_status) {
                 assert!(matches!(result, Err(HttpFetcherError::Moving(_))));
                 if let Err(HttpFetcherError::Moving(redir)) = result {
-                    assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
-                    assert_eq!(redir.to.as_str(), http_location);
+                    assert_eq!(redir.from.as_str(), server.url(INITIAL_URL));
+                    assert_eq!(redir.to.as_str(), https_location);
                 }
             } else if is_permanent_redirect(redirect_status) {
                 assert!(matches!(result, Err(HttpFetcherError::Moved(_))));
                 if let Err(HttpFetcherError::Moved(redir)) = result {
-                    assert_eq!(redir.from.as_str(), server1.url(INITIAL_URL));
-                    assert_eq!(redir.to.as_str(), http_location);
+                    assert_eq!(redir.from.as_str(), server.url(INITIAL_URL));
+                    assert_eq!(redir.to.as_str(), https_location);
                 }
             }
         }
