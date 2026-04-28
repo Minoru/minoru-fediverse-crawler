@@ -448,6 +448,13 @@ mod test {
             let server1 = MockServer::start();
             let server2 = MockServer::start();
 
+            // Verify the two mock servers only differ in port (same scheme + host).
+            let url1 = Url::parse(&server1.url(INITIAL_URL)).unwrap();
+            let url2 = Url::parse(&server2.url(TARGET_URL)).unwrap();
+            assert_eq!(url1.scheme(), url2.scheme());
+            assert_eq!(url1.host(), url2.host());
+            assert_ne!(url1.port(), url2.port());
+
             let mock_redirect = server1.mock(|when, then| {
                 when.method("GET").path(INITIAL_URL);
                 then.status(redirect_status)
