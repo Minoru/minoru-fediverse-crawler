@@ -694,6 +694,46 @@ mod test {
     }
 
     #[test]
+    fn get_preserves_user_agent_header_across_redirects() {
+        const INITIAL_URL: &str = "/initial";
+        const FINAL_URL: &str = "/final";
+        const STATUS_FINAL: u16 = 200;
+        const BODY: &str = "Redirected successfully.";
+        const USER_AGENT: &str = "Minoru's Fediverse Crawler (+https://nodes.fediverse.party)";
+
+        let server = MockServer::start();
+
+        let mock_redirect = server.mock(|when, then| {
+            when.method("GET")
+                .path(INITIAL_URL)
+                .header("User-Agent", USER_AGENT);
+            then.status(302).header("Location", server.url(FINAL_URL));
+        });
+
+        let mock_final = server.mock(|when, then| {
+            when.method("GET")
+                .path(FINAL_URL)
+                .header("User-Agent", USER_AGENT);
+            then.status(STATUS_FINAL).body(BODY);
+        });
+
+        let logger = slog::Logger::root(slog::Discard, slog::o!());
+        let fetcher = HttpFetcher::new(logger);
+
+        let url = server.url(INITIAL_URL);
+        let url = url::Url::parse(&url).unwrap();
+
+        let response = fetcher.get(&url, None).unwrap();
+
+        mock_redirect.assert();
+        mock_final.assert();
+
+        assert_eq!(response.get_url(), server.url(FINAL_URL));
+        assert_eq!(response.status(), STATUS_FINAL);
+        assert_eq!(response.into_string().unwrap(), BODY);
+    }
+
+    #[test]
     fn get_times_out_on_slow_response() {
         const URL: &str = "/slow";
         const DELAY_SECS: u64 = 35;
