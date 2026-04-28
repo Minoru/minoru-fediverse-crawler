@@ -23,6 +23,8 @@ robotstxt = { version = "0.3", default-features = false }
 tempfile = { version = "3", default-features = false }
 addr = { version = "0.15", default-features = false, features = [ "psl" ] }
 flate2 = { version = "1", default-features = false }
+
+[dev-dependencies]
 httpmock = "0.8.3"
 mockall = "0.14.0"
 
