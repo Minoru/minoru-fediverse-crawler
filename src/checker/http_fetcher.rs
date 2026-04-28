@@ -783,8 +783,6 @@ mod test {
         let result = fetcher.get(&url, None);
         let elapsed = start.elapsed();
 
-        drop(listener);
-
         assert!(matches!(result, Err(HttpFetcherError::UreqError(_))));
         if let Err(HttpFetcherError::UreqError(err)) = result {
             assert_eq!(err.kind(), ureq::ErrorKind::Io);
