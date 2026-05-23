@@ -26,6 +26,13 @@ target/release/minoru-fediverse-crawler: FORCE
 		--mount type=bind,src=$(HOME)/.cargo/registry,target=/home/builder/.cargo/registry \
 		--user $(shell id -u):$(shell id -g) \
 		minoru-fediverse-crawler-buildhost \
+		cargo test
+	docker run \
+		--rm \
+		--mount type=bind,src=$(PWD),target=/home/builder/src \
+		--mount type=bind,src=$(HOME)/.cargo/registry,target=/home/builder/.cargo/registry \
+		--user $(shell id -u):$(shell id -g) \
+		minoru-fediverse-crawler-buildhost \
 		cargo build --release
 
 deploy: index.html index.html.gz ansible/minoru-fediverse-crawler.service target/release/minoru-fediverse-crawler
