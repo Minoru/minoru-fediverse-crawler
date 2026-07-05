@@ -9,30 +9,27 @@ index.html.gz: index.html
 # Cargo takes care of rebuilding this file when necessary; we just have to
 # force Make to run Cargo even if Make doesn't see a reason to run it.
 target/release/minoru-fediverse-crawler: FORCE
-	docker build \
-		--tag=minoru-fediverse-crawler-buildhost \
+	podman build \
+		--tag=localhost/minoru-fediverse-crawler-buildhost \
 		--file=docker/buildhost.dockerfile \
 		docker
-	docker run \
+	podman run \
 		--rm \
-		--mount type=bind,src=$(PWD),target=/home/builder/src \
-		--mount type=bind,src=$(HOME)/.cargo/registry,target=/home/builder/.cargo/registry \
-		--user $(shell id -u):$(shell id -g) \
-		minoru-fediverse-crawler-buildhost \
+		--mount type=bind,src=$(PWD),target=/src \
+		--mount type=bind,src=$(HOME)/.cargo/registry,target=/root/.cargo/registry \
+		localhost/minoru-fediverse-crawler-buildhost:latest \
 		cargo clippy --all-features --all-targets
-	docker run \
+	podman run \
 		--rm \
-		--mount type=bind,src=$(PWD),target=/home/builder/src \
-		--mount type=bind,src=$(HOME)/.cargo/registry,target=/home/builder/.cargo/registry \
-		--user $(shell id -u):$(shell id -g) \
-		minoru-fediverse-crawler-buildhost \
+		--mount type=bind,src=$(PWD),target=/src \
+		--mount type=bind,src=$(HOME)/.cargo/registry,target=/root/.cargo/registry \
+		localhost/minoru-fediverse-crawler-buildhost:latest \
 		cargo test
-	docker run \
+	podman run \
 		--rm \
-		--mount type=bind,src=$(PWD),target=/home/builder/src \
-		--mount type=bind,src=$(HOME)/.cargo/registry,target=/home/builder/.cargo/registry \
-		--user $(shell id -u):$(shell id -g) \
-		minoru-fediverse-crawler-buildhost \
+		--mount type=bind,src=$(PWD),target=/src \
+		--mount type=bind,src=$(HOME)/.cargo/registry,target=/root/.cargo/registry \
+		localhost/minoru-fediverse-crawler-buildhost:latest \
 		cargo build --release
 
 deploy: index.html index.html.gz ansible/minoru-fediverse-crawler.service target/release/minoru-fediverse-crawler

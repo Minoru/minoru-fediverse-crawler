@@ -8,22 +8,14 @@ RUN apt-get update \
     && apt-get autoremove \
     && apt-get clean
 
-RUN addgroup --gid 1000 builder \
-    && adduser --home /home/builder --uid 1000 --ingroup builder \
-        --disabled-password --shell /bin/bash builder \
-    && mkdir -p /home/builder/src \
-    && chown -R builder:builder /home/builder
-
-USER builder
-ENV HOME /home/builder
-WORKDIR /home/builder/src
-
-RUN wget -O $HOME/rustup.sh --secure-protocol=TLSv1_3 https://sh.rustup.rs \
-    && chmod +x $HOME/rustup.sh \
-    && $HOME/rustup.sh -y \
+RUN wget -O /tmp/rustup.sh --secure-protocol=TLSv1_3 https://sh.rustup.rs \
+    && chmod +x /tmp/rustup.sh \
+    && /tmp/rustup.sh -y \
         --default-host x86_64-unknown-linux-gnu \
         --default-toolchain 1.96.0 \
-    && chmod a+w $HOME/.cargo
+    && chmod a+w /root/.cargo
 
-ENV PATH $HOME/.cargo/bin:$PATH
-RUN mkdir -p $HOME/.cargo/registry
+ENV PATH /root/.cargo/bin:$PATH
+RUN mkdir -p /root/.cargo/registry
+
+WORKDIR /src
