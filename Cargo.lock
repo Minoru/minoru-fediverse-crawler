@@ -1346,9 +1346,9 @@ dependencies = [
 
 [[package]]
 name = "slog-journald"
-version = "2.3.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f961ef377b5e68b382307166131ef015c059e213716cf040df99ba4ab952e58"
+checksum = "17ae134a4c71abfc7a6a47021b7c4c2b48859ab2062d0258479b4daa83f17aab"
 dependencies = [
  "libsystemd",
  "slog",
