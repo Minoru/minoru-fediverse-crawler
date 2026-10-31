@@ -11,25 +11,72 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v7
 
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v6
+      - name: Set up Docker buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v7
         with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
+          file: docker/buildhost.dockerfile
+
+          cache-from: type=gha,scope=buildhost
+          cache-to: type=gha,scope=buildhost,mode=max
+
+          push: false
+          load: true
+
+          tags: buildhost
+
+      - name: Pre-create ~/.cargo subdirs
+        run: |
+          mkdir --parents ~/.cargo/git
+          mkdir --parents ~/.cargo/registry
+
+      - name: Cache ~/.cargo
+        uses: actions/cache@v6
+        id: cargo_cache
+        with:
+          key: cargo-${{ hashFiles('Cargo.lock', '**/Cargo.toml') }}
           path: |
-            ~/.cargo/registry/cache
-            ~/.cargo/registry/index
+            ~/.cargo/git
+            ~/.cargo/registry
 
-      - name: "Install project's dependencies"
-        run: sudo apt-get update && sudo apt-get install --assume-yes libsystemd-dev
+      - name: Run Cargo check
+        run: |
+          docker run \
+              --rm \
+              --mount type=bind,source=$HOME/.cargo/git,target=/home/builder/.cargo/git \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/home/builder/.cargo/registry \
+              --mount type=bind,source=$(pwd),target=/src \
+              buildhost:latest \
+              cargo check
 
-      - name: "cargo check"
-        run: cargo check
+      - name: Run Clippy
+        run: |
+          docker run \
+              --rm \
+              --mount type=bind,source=$HOME/.cargo/git,target=/home/builder/.cargo/git \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/home/builder/.cargo/registry \
+              --mount type=bind,source=$(pwd),target=/src \
+              buildhost:latest \
+              cargo clippy --all-features --all-targets
 
-      - name: "cargo clippy"
-        run: cargo clippy --all-features
+      - name: Test
+        run: |
+          docker run \
+              --rm \
+              --mount type=bind,source=$HOME/.cargo/git,target=/home/builder/.cargo/git \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/home/builder/.cargo/registry \
+              --mount type=bind,source=$(pwd),target=/src \
+              buildhost:latest \
+              cargo test
 
-      - name: "cargo build"
-        run: cargo build
-
-      - name: "cargo test"
-        run: cargo test
+      - name: Build
+        run: |
+          docker run \
+              --rm \
+              --mount type=bind,source=$HOME/.cargo/git,target=/home/builder/.cargo/git \
+              --mount type=bind,source=$HOME/.cargo/registry,target=/home/builder/.cargo/registry \
+              --mount type=bind,source=$(pwd),target=/src \
+              buildhost:latest \
+              cargo build --release
