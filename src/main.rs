@@ -59,7 +59,7 @@ fn parse_args() -> anyhow::Result<Args> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let logger = slog::Logger::root(slog_journald::JournaldDrain.ignore_res(), o!());
+    let logger = slog::Logger::root(slog_journald::JournaldDrain::default().ignore_res(), o!());
     logged_main(logger.clone()).map_err(|err| {
         error!(logger, "{:?}", err);
         err
